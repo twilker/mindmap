@@ -15,12 +15,19 @@
 let rootNode;
 let nextId = 0;
 
-// Spacing constants (feel free to tweak these for different layouts).
-const H_SPACING = 180; // horizontal distance between generations
-// Vertical distance between siblings; increase this constant to provide more
-// space for multi‑line node labels. Larger values help prevent overlapping
-// when many nodes have lengthy text. Feel free to adjust if necessary.
-const V_SPACING = 80;
+// Visual sizing constants shared by the renderer. Keeping the node dimensions
+// in a single place makes it easier to tune the layout when tweaking the
+// appearance.
+const NODE_WIDTH = 200;
+const NODE_HEIGHT = 80;
+const NODE_MARGIN_X = 80;
+const NODE_MARGIN_Y = 40;
+
+// Spacing constants derived from the node geometry. By tying the distances to
+// the node dimensions we ensure that horizontal/vertical spacing is always
+// sufficient to avoid overlap, even when the node width or height changes.
+const H_SPACING = NODE_WIDTH + NODE_MARGIN_X; // horizontal distance between generations
+const V_SPACING = NODE_HEIGHT + NODE_MARGIN_Y; // vertical distance between siblings
 
 // D3 selection for the SVG container.
 let svg;
@@ -246,22 +253,30 @@ function renderMindMap() {
   }
   const positions = computePositions();
   // Compute viewBox to fit content.
-  let minX = 0,
-    maxX = 0,
-    minY = 0,
-    maxY = 0;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
   Object.values(positions).forEach(({ x, y }) => {
     if (x < minX) minX = x;
     if (x > maxX) maxX = x;
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
   });
+  const rootPosition = positions[rootNode.id] || { y: 0 };
+  const topSpace = rootPosition.y - minY;
+  const bottomSpace = maxY - rootPosition.y;
+  if (topSpace < bottomSpace) {
+    minY = rootPosition.y - bottomSpace;
+  } else {
+    maxY = rootPosition.y + topSpace;
+  }
   // Extend the horizontal range to accommodate label boxes that extend beyond
-  // the node positions. Each label can extend up to 232px to the left or
-  // right of its node (220px width + 12px offset), so add padding before
-  // computing the viewBox. Without this, labels on the left side can be
-  // clipped outside the viewBox and become invisible.
-  const labelPad = 240;
+  // the node positions. Each label spans NODE_WIDTH pixels plus the 12px offset
+  // applied during rendering, so we add padding before computing the viewBox.
+  // Without this, labels on the left side can be clipped outside the viewBox
+  // and become invisible.
+  const labelPad = NODE_WIDTH + 32;
   minX -= labelPad;
   maxX += labelPad;
   const margin = 60;
@@ -337,11 +352,12 @@ function renderMindMap() {
     .on('click', function(event, d) {
       focusOnNode(d.node.id);
     });
-  // Append foreignObject for editable text. Increase width slightly for easier editing.
+  // Append foreignObject for editable text using a fixed-size box so layout math
+  // can assume consistent dimensions.
   const fo = nodeEnter.append('foreignObject')
     .attr('class', 'node-fo')
-    .attr('width', 220)
-    .attr('height', 30);
+    .attr('width', NODE_WIDTH)
+    .attr('height', NODE_HEIGHT);
   // Also attach click handler on the foreignObject itself so that clicking on empty
   // space within it will still focus the node.
   fo.on('click', function(event, d) {
@@ -355,6 +371,16 @@ function renderMindMap() {
     // long words break appropriately instead of overflowing into other nodes.
     .style('white-space', 'normal')
     .style('overflow-wrap', 'anywhere')
+    .style('overflow-y', 'auto')
+    .style('width', '100%')
+    .style('height', '100%')
+    .style('padding', '8px')
+    .style('box-sizing', 'border-box')
+    .style('border-radius', '10px')
+    .style('background', '#ffffff')
+    .style('border', '1px solid rgba(74, 144, 226, 0.35)')
+    .style('box-shadow', '0 2px 6px rgba(15, 23, 42, 0.12)')
+    .style('line-height', '1.3')
     .style('outline', 'none')
     .style('cursor', 'text');
   // Update positions for both enter and update selections
@@ -365,22 +391,17 @@ function renderMindMap() {
   // Update text content and events
   nodeSel.merge(nodeEnter).select('.node-fo')
     // Position the editable text box to the right of the circle for right‑side nodes
-    // and to the left for left‑side nodes. The width of the text box is 220, so
-    // offset by 12 to the right and by -(220 + 12) = -232 to the left.
-    .attr('x', d => (d.x >= 0 ? 12 : -232))
-    .attr('y', -15);
+    // and to the left for left‑side nodes. The offset mirrors the node width to
+    // keep spacing symmetric.
+    .attr('width', NODE_WIDTH)
+    .attr('height', NODE_HEIGHT)
+    .attr('x', d => (d.x >= 0 ? 12 : -(NODE_WIDTH + 12)))
+    .attr('y', -(NODE_HEIGHT / 2));
   nodeSel.merge(nodeEnter).select('.node-text')
     .each(function(d) {
       const div = this;
       div.textContent = d.node.text;
       div.dataset.nodeId = d.node.id;
-      // Adjust the height of the surrounding foreignObject based on the
-      // scrollHeight of the editable div. This allows multi‑line nodes to
-      // expand vertically as needed without overlapping neighbouring nodes.
-      const foEl = div.parentNode;
-      // Set min height to 24px to ensure a single line fits, but allow taller.
-      const neededHeight = Math.max(div.scrollHeight, 24);
-      d3.select(foEl).attr('height', neededHeight);
     })
     .on('keydown', function(event, d) {
        const id = this.dataset.nodeId;
