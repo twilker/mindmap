@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mind Map Editor</title>
+  <!-- External libraries -->
+  <!-- D3 is used for drawing SVG elements and assisting with tree layout.
+       Markmap is no longer used as we implement our own symmetric mindmap layout. -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <!-- JSZip is used to unzip the MindMeister .mind file format on the client
+       side. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Our styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Mind Map Editor</h1>
+    <p>
+      Interact directly with the mind map: click on a node to edit its text.
+      Press <strong>Enter</strong> to create a sibling, and <strong>Tab</strong>
+      to create a child. The layout engine arranges branches symmetrically
+      around the center.
+    </p>
+  </header>
+  <section id="controls">
+    <!-- Import/export buttons and DB actions -->
+    <button id="importTxtBtn">Import Text</button>
+    <input type="file" id="txtFileInput" accept=".txt" style="display:none" />
+    <button id="exportTxtBtn">Export Text</button>
+    <button id="exportSvgBtn">Export SVG</button>
+    <button id="importMindBtn">Import .mind (MindMeister)</button>
+    <input type="file" id="mindFileInput" accept=".mind" style="display:none" />
+    <label for="mapNameInput">Name:</label>
+    <input type="text" id="mapNameInput" placeholder="Mind map name" />
+    <button id="saveMapBtn">Save to DB</button>
+    <label for="savedSelect">Load:</label>
+    <select id="savedSelect"></select>
+    <button id="loadMapBtn">Load</button>
+    <button id="deleteMapBtn">Delete</button>
+  </section>
+  <main>
+    <div id="viewer">
+      <!-- The SVG element for the mind map will be inserted here -->
+      <svg id="mindmapCanvas"></svg>
+    </div>
+    <!-- Hidden textarea to hold the bullet list representation for import/export and DB storage -->
+    <textarea id="markdownInput" style="display: none;"></textarea>
+  </main>
+  <!-- Our script -->
+  <script src="script.js"></script>
+</body>
+</html>

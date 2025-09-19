@@ -1,0 +1,108 @@
+/* General resets */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f7f7f9;
+  color: #333;
+}
+
+header {
+  padding: 1rem;
+  background-color: #4a90e2;
+  color: white;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+header p {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+section#controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background-color: #e9eef5;
+  gap: 0.5rem;
+  border-bottom: 1px solid #ccd5e3;
+}
+
+section#controls button {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+  border: none;
+  background-color: #4a90e2;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+section#controls button:hover {
+  background-color: #357ab5;
+}
+
+section#controls input[type="text"] {
+  padding: 0.3rem;
+  font-size: 0.85rem;
+  border: 1px solid #ccd5e3;
+  border-radius: 4px;
+}
+
+section#controls select {
+  padding: 0.3rem;
+  font-size: 0.85rem;
+  border: 1px solid #ccd5e3;
+  border-radius: 4px;
+}
+
+main {
+  display: flex;
+  flex-direction: row;
+  height: calc(100vh - 140px);
+  /* Account for header and controls height; adjust if header or controls change */
+}
+
+/* Viewer occupies the full main area now that the text editor is hidden. */
+main {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 140px);
+}
+
+#viewer {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+  background-color: white;
+}
+
+/* The hidden textarea remains present for data storage but is not displayed. */
+textarea#markdownInput {
+  display: none;
+}
+
+/* Viewer styling */
+svg#mindmapCanvas {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 800px) {
+  main {
+    height: auto;
+  }
+  #viewer {
+    height: 60vh;
+  }
+}
