@@ -18,18 +18,28 @@ let nextId = 0;
 // Visual sizing constants shared by the renderer. Keeping the node dimensions
 // in a single place makes it easier to tune the layout when tweaking the
 // appearance.
-const NODE_MAX_WIDTH = 220;
-const DEFAULT_NODE_HEIGHT = 80;
+const NODE_MAX_WIDTH = 240;
+const NODE_MIN_WIDTH = 80;
+const NODE_MIN_HEIGHT = 44;
 const NODE_MARGIN_X = 80;
 const NODE_VERTICAL_GAP = 24;
+const ZOOM_MIN_SCALE = 0.2;
+const ZOOM_MAX_SCALE = 3;
+const BOUNDS_MARGIN = 80;
 
 // Spacing constants derived from the node geometry. By tying the horizontal
 // spacing to the node's maximum width, we guarantee that branches stay clear of
 // each other even when text boxes expand vertically to fit their content.
 // D3 selection for the SVG container.
 let svg;
+let zoomLayer;
 let gLink;
 let gNode;
+let zoomBehavior;
+let currentTransform = d3.zoomIdentity;
+let homeTransform = d3.zoomIdentity;
+let autoFitPending = true;
+let lastContentBounds = null;
 // Predefined color palette for root branches. Feel free to tweak or expand this
 // list for additional distinct colors. Colors are applied to links for each
 // top‑level branch to mimic the coloured routing in typical mind maps.
@@ -81,12 +91,21 @@ function scheduleMeasurement() {
   });
 }
 
+function estimateInitialWidth(text = '') {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return NODE_MIN_WIDTH + 24;
+  }
+  const approx = trimmed.length * 6.5 + 32;
+  return Math.max(NODE_MIN_WIDTH, Math.min(NODE_MAX_WIDTH, approx));
+}
+
 function getNodeBoxSize(node) {
   const cached = nodeSizeCache.get(node.id);
   if (cached) {
     return cached;
   }
-  return { width: NODE_MAX_WIDTH, height: DEFAULT_NODE_HEIGHT };
+  return { width: estimateInitialWidth(node.text || ''), height: NODE_MIN_HEIGHT };
 }
 
 function getNodeLayoutHeight(node) {
@@ -96,12 +115,12 @@ function getNodeLayoutHeight(node) {
 
 function getClampedBoxWidth(node) {
   const { width } = getNodeBoxSize(node);
-  return Math.min(Math.max(width, 80), NODE_MAX_WIDTH);
+  return Math.min(Math.max(width, NODE_MIN_WIDTH), NODE_MAX_WIDTH);
 }
 
 function getClampedBoxHeight(node) {
   const { height } = getNodeBoxSize(node);
-  return Math.max(height, 40);
+  return Math.max(height, NODE_MIN_HEIGHT);
 }
 
 // Open or create the IndexedDB database.
@@ -385,18 +404,10 @@ function updateNodeSizeCache() {
   elements.forEach(div => {
     const id = parseInt(div.dataset.nodeId, 10);
     if (Number.isNaN(id)) return;
-    const fo = div.closest('foreignObject');
-    const foRect = fo ? fo.getBoundingClientRect() : null;
-    const attrWidth = fo ? parseFloat(fo.getAttribute('width')) || NODE_MAX_WIDTH : NODE_MAX_WIDTH;
-    const attrHeight = fo ? parseFloat(fo.getAttribute('height')) || DEFAULT_NODE_HEIGHT : DEFAULT_NODE_HEIGHT;
-    const scaleX = foRect && foRect.width ? attrWidth / foRect.width : 1;
-    const scaleY = foRect && foRect.height ? attrHeight / foRect.height : 1;
     const rawWidth = Math.max(div.scrollWidth, div.offsetWidth);
     const rawHeight = Math.max(div.scrollHeight, div.offsetHeight);
-    const measuredWidth = rawWidth * scaleX;
-    const measuredHeight = rawHeight * scaleY;
-    const width = Math.min(Math.max(measuredWidth, 80), NODE_MAX_WIDTH);
-    const height = Math.max(measuredHeight, 40);
+    const width = Math.min(Math.max(rawWidth, NODE_MIN_WIDTH), NODE_MAX_WIDTH);
+    const height = Math.max(rawHeight, NODE_MIN_HEIGHT);
     const prev = nodeSizeCache.get(id);
     if (!prev || Math.abs(prev.width - width) > 0.5 || Math.abs(prev.height - height) > 0.5) {
       nodeSizeCache.set(id, { width, height });
@@ -406,44 +417,73 @@ function updateNodeSizeCache() {
   return changed;
 }
 
+function ensureSvg() {
+  if (svg) return;
+  svg = d3.select('#mindmapCanvas');
+  zoomBehavior = d3.zoom()
+    .scaleExtent([ZOOM_MIN_SCALE, ZOOM_MAX_SCALE])
+    .on('zoom', (event) => {
+      currentTransform = event.transform;
+      if (zoomLayer) {
+        zoomLayer.attr('transform', currentTransform);
+      }
+    });
+  svg.call(zoomBehavior).on('dblclick.zoom', null);
+  zoomLayer = svg.append('g').attr('class', 'zoom-layer');
+  zoomLayer.attr('transform', currentTransform);
+  gLink = zoomLayer.append('g').attr('class', 'links');
+  gNode = zoomLayer.append('g').attr('class', 'nodes');
+}
+
+function applyAutoFit(bounds) {
+  if (!svg || !zoomBehavior || !bounds) return;
+  const svgNode = svg.node();
+  if (!svgNode) return;
+  const width = svgNode.clientWidth;
+  const height = svgNode.clientHeight;
+  if (!width || !height) return;
+  const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
+  const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);
+  const scale = Math.min(width / contentWidth, height / contentHeight);
+  const clampedScale = Math.max(ZOOM_MIN_SCALE, Math.min(ZOOM_MAX_SCALE, scale));
+  const translateX = (width - contentWidth * clampedScale) / 2 - bounds.minX * clampedScale;
+  const translateY = (height - contentHeight * clampedScale) / 2 - bounds.minY * clampedScale;
+  const transform = d3.zoomIdentity.translate(translateX, translateY).scale(clampedScale);
+  currentTransform = transform;
+  homeTransform = transform;
+  svg.transition().duration(350).call(zoomBehavior.transform, transform);
+}
+
+function requestAutoFit() {
+  autoFitPending = true;
+  currentTransform = d3.zoomIdentity;
+  homeTransform = d3.zoomIdentity;
+  if (zoomLayer) {
+    zoomLayer.attr('transform', currentTransform);
+  }
+}
+
 // Render the mind map based on the current rootNode.
 function renderMindMap() {
-  if (!svg) {
-    svg = d3.select('#mindmapCanvas');
-    // Create groups for links and nodes.
-    gLink = svg.append('g').attr('class', 'links');
-    gNode = svg.append('g').attr('class', 'nodes');
-  }
+  if (!rootNode) return;
+  ensureSvg();
+  zoomLayer.attr('transform', currentTransform);
   const positions = computePositions();
-  // Compute viewBox to fit content.
+  const nodeValues = Object.values(positions);
+  if (!nodeValues.length) return;
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-  Object.values(positions).forEach(pos => {
+  nodeValues.forEach(pos => {
     const bounds = getNodeBoundingRect(pos);
     if (bounds.top < minY) minY = bounds.top;
     if (bounds.bottom > maxY) maxY = bounds.bottom;
     if (bounds.left < minX) minX = bounds.left;
     if (bounds.right > maxX) maxX = bounds.right;
   });
-  const rootPosition = positions[rootNode.id] || { y: 0 };
-  const topSpace = rootPosition.y - minY;
-  const bottomSpace = maxY - rootPosition.y;
-  if (topSpace < bottomSpace) {
-    minY = rootPosition.y - bottomSpace;
-  } else {
-    maxY = rootPosition.y + topSpace;
-  }
-  // Extend the computed bounds with extra padding so node shadows and expanded
-  // text boxes remain fully visible after zooming or exporting.
-  const margin = 60;
-  const width = maxX - minX || 1;
-  const height = maxY - minY || 1;
-  svg.attr('viewBox', `${minX - margin} ${minY - margin} ${width + margin * 2} ${height + margin * 2}`);
-  // Build links data: for each node (except root) create a link from parent to node.
   const links = [];
-  Object.values(positions).forEach(pos => {
+  nodeValues.forEach(pos => {
     const node = pos.node;
     if (!node.parent) return;
     const parentPos = positions[node.parent.id];
@@ -465,33 +505,34 @@ function renderMindMap() {
     minY = Math.min(minY, source.y, target.y);
     maxY = Math.max(maxY, source.y, target.y);
   });
-  // Assign colours to each top‑level branch (children of root). We'll reuse the
-  // same colour for all links that belong to a branch. Compute a mapping from
-  // branch node id to a colour from the palette.
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+    minX = -NODE_MAX_WIDTH;
+    maxX = NODE_MAX_WIDTH;
+    minY = -NODE_MIN_HEIGHT;
+    maxY = NODE_MIN_HEIGHT;
+  }
+  lastContentBounds = {
+    minX: minX - BOUNDS_MARGIN,
+    maxX: maxX + BOUNDS_MARGIN,
+    minY: minY - BOUNDS_MARGIN,
+    maxY: maxY + BOUNDS_MARGIN
+  };
   const branchColors = {};
   if (rootNode.children && rootNode.children.length) {
     rootNode.children.forEach((child, idx) => {
       branchColors[child.id] = BRANCH_COLORS[idx % BRANCH_COLORS.length];
     });
   }
-  // Helper function to find the root‑level branch id for a given node. If the
-  // node is a direct child of root, its own id is used. Otherwise we ascend
-  // through its parents until reaching a child of root.
   function getBranchId(node) {
     let current = node;
     while (current && current.parent && current.parent !== rootNode) {
       current = current.parent;
     }
-    // If current has parent equal to rootNode, it's a top‑level child. Otherwise
-    // current may be the root itself (no parent), in which case we return null.
     return current && current.parent === rootNode ? current.id : null;
   }
-  // Prepare link generator for curved (horizontal) links.
   const linkGenerator = d3.linkHorizontal()
     .x(d => d.x)
     .y(d => d.y);
-  // JOIN links (using <path> elements for curves). Use branch colour if
-  // available, otherwise default to grey.
   const linkSel = gLink.selectAll('path').data(links, d => `${d.parent.id}-${d.node.id}`);
   linkSel.enter()
     .append('path')
@@ -504,54 +545,41 @@ function renderMindMap() {
       return branchId && branchColors[branchId] ? branchColors[branchId] : '#888';
     });
   linkSel.exit().remove();
-  // JOIN nodes
-  const nodeValues = Object.values(positions);
   const nodeSel = gNode.selectAll('g.node').data(nodeValues, d => d.node.id);
   const nodeEnter = nodeSel.enter().append('g').attr('class', 'node');
-  // Make the entire node group focusable when clicked. Clicking anywhere on the group
-  // will focus the editable text inside the node.
   nodeEnter.on('click', function(event, d) {
-    // Prevent focus change if a text selection is already active within the node.
-    // Always call focusOnNode to select the corresponding editable div.
     focusOnNode(d.node.id);
   });
-  // Append foreignObject for editable text. The width is limited by a maximum
-  // value but the height grows with the content, so nodes expand naturally.
   const fo = nodeEnter.append('foreignObject')
     .attr('class', 'node-fo')
-    .attr('width', NODE_MAX_WIDTH)
-    .attr('height', DEFAULT_NODE_HEIGHT);
-  // Also attach click handler on the foreignObject itself so that clicking on empty
-  // space within it will still focus the node.
+    .attr('width', d => d.width || getClampedBoxWidth(d.node))
+    .attr('height', d => d.height || getClampedBoxHeight(d.node));
   fo.on('click', function(event, d) {
     focusOnNode(d.node.id);
   });
+  const maxWidthPx = `${NODE_MAX_WIDTH}px`;
+  const minWidthPx = `${NODE_MIN_WIDTH}px`;
   fo.append('xhtml:div')
     .attr('xmlns', 'http://www.w3.org/1999/xhtml')
     .attr('contenteditable', true)
     .attr('class', 'node-text')
-    // Allow multi‑line wrapping and automatic line breaks. Overflow wrap ensures
-    // long words break appropriately instead of overflowing into other nodes.
     .style('white-space', 'normal')
     .style('overflow-wrap', 'anywhere')
     .style('overflow-y', 'visible')
     .style('display', 'inline-block')
     .style('width', 'auto')
-    .style('max-width', '100%')
-    .style('min-width', '80px')
+    .style('max-width', maxWidthPx)
+    .style('min-width', minWidthPx)
     .style('height', 'auto')
     .style('padding', '8px')
     .style('box-sizing', 'border-box')
     .style('border-radius', '10px')
     .style('background', '#ffffff')
-    .style('box-shadow', '0 2px 6px rgba(15, 23, 42, 0.12)')
     .style('line-height', '1.3')
     .style('outline', 'none')
     .style('cursor', 'text');
-  // Update positions for both enter and update selections
   nodeSel.merge(nodeEnter)
     .attr('transform', d => `translate(${d.x},${d.y})`);
-  // Update text content and events
   nodeSel.merge(nodeEnter).select('.node-fo')
     .each(function(d) {
       const width = d.width || getClampedBoxWidth(d.node);
@@ -579,31 +607,29 @@ function renderMindMap() {
     .classed('side-left', d => d.side === 'left')
     .classed('side-right', d => d.side === 'right')
     .classed('side-root', d => d.side === 'root')
+    .style('max-width', maxWidthPx)
+    .style('min-width', minWidthPx)
     .style('text-align', d => {
       if (d.side === 'left') return 'right';
       if (d.side === 'right') return 'left';
       return 'center';
     })
     .on('keydown', function(event, d) {
-       const id = this.dataset.nodeId;
-       const node = findNodeById(rootNode, parseInt(id));
-       if (!node) return;
-       // If Enter is pressed without Shift, create a sibling. If Shift+Enter,
-       // allow a new line to be inserted into the current node. This permits
-       // multi‑line text editing without triggering new node creation. Tab
-       // creates a child node. Other keys are left untouched.
-       if (event.key === 'Enter' && !event.shiftKey) {
-         event.preventDefault();
-         const newNode = addSibling(node);
-         renderMindMap();
-         setTimeout(() => focusOnNode(newNode.id), 0);
-       } else if (event.key === 'Tab') {
-         event.preventDefault();
-         const newNode = addChild(node);
-         renderMindMap();
-         setTimeout(() => focusOnNode(newNode.id), 0);
-       }
-     })
+      const id = this.dataset.nodeId;
+      const node = findNodeById(rootNode, parseInt(id));
+      if (!node) return;
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        const newNode = addSibling(node);
+        renderMindMap();
+        setTimeout(() => focusOnNode(newNode.id), 0);
+      } else if (event.key === 'Tab') {
+        event.preventDefault();
+        const newNode = addChild(node);
+        renderMindMap();
+        setTimeout(() => focusOnNode(newNode.id), 0);
+      }
+    })
     .on('input', function(event, d) {
       const id = this.dataset.nodeId;
       const node = findNodeById(rootNode, parseInt(id));
@@ -613,8 +639,11 @@ function renderMindMap() {
       scheduleMeasurement();
     });
   nodeSel.exit().remove();
+  if (autoFitPending && lastContentBounds) {
+    autoFitPending = false;
+    applyAutoFit(lastContentBounds);
+  }
   scheduleMeasurement();
-  // Update hidden markdown representation after rendering.
   updateMarkdownInput();
 }
 
@@ -752,6 +781,7 @@ async function importMindFile(file) {
     if (parsed) {
       nodeSizeCache.clear();
       rootNode = parsed;
+      requestAutoFit();
       renderMindMap();
     }
   } catch (err) {
@@ -771,6 +801,7 @@ function importTextFile(file) {
     if (parsed) {
       nodeSizeCache.clear();
       rootNode = parsed;
+      requestAutoFit();
       renderMindMap();
     }
   };
@@ -800,6 +831,18 @@ function exportSvg() {
   // Clone the svg node and serialize it.
   const svgNode = document.getElementById('mindmapCanvas');
   const clone = svgNode.cloneNode(true);
+  const exportBounds = lastContentBounds;
+  if (exportBounds) {
+    const width = Math.max(exportBounds.maxX - exportBounds.minX, 1);
+    const height = Math.max(exportBounds.maxY - exportBounds.minY, 1);
+    clone.setAttribute('viewBox', `${exportBounds.minX} ${exportBounds.minY} ${width} ${height}`);
+    clone.setAttribute('width', width);
+    clone.setAttribute('height', height);
+    const layer = clone.querySelector('.zoom-layer');
+    if (layer) {
+      layer.setAttribute('transform', 'translate(0,0) scale(1)');
+    }
+  }
   const serializer = new XMLSerializer();
   let svgString = serializer.serializeToString(clone);
   svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
@@ -845,6 +888,7 @@ async function handleLoad() {
   if (parsed) {
     nodeSizeCache.clear();
     rootNode = parsed;
+    requestAutoFit();
     renderMindMap();
   }
 }
@@ -884,6 +928,32 @@ function setupFileInputs() {
   });
 }
 
+function setupZoomControls() {
+  const zoomInBtn = document.getElementById('zoomInBtn');
+  const zoomOutBtn = document.getElementById('zoomOutBtn');
+  const resetBtn = document.getElementById('resetViewBtn');
+  const zoomStep = 1.2;
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener('click', () => {
+      if (!svg || !zoomBehavior) return;
+      svg.transition().duration(200).call(zoomBehavior.scaleBy, zoomStep);
+    });
+  }
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener('click', () => {
+      if (!svg || !zoomBehavior) return;
+      svg.transition().duration(200).call(zoomBehavior.scaleBy, 1 / zoomStep);
+    });
+  }
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (!svg || !zoomBehavior) return;
+      const target = homeTransform || d3.zoomIdentity;
+      svg.transition().duration(300).call(zoomBehavior.transform, target);
+    });
+  }
+}
+
 // Initialize the application.
 async function init() {
   // Set up buttons and inputs.
@@ -893,11 +963,13 @@ async function init() {
   document.getElementById('loadMapBtn').addEventListener('click', handleLoad);
   document.getElementById('deleteMapBtn').addEventListener('click', handleDelete);
   setupFileInputs();
+  setupZoomControls();
   await refreshSavedList();
   // Initialise a default root node.
   nextId = 0;
   nodeSizeCache.clear();
   rootNode = createNode('Central Topic', null);
+  requestAutoFit();
   renderMindMap();
 }
 
