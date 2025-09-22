@@ -26,8 +26,6 @@ const NODE_VERTICAL_GAP = 24;
 // Spacing constants derived from the node geometry. By tying the horizontal
 // spacing to the node's maximum width, we guarantee that branches stay clear of
 // each other even when text boxes expand vertically to fit their content.
-const H_SPACING = NODE_MAX_WIDTH + NODE_MARGIN_X; // horizontal distance between generations
-
 // D3 selection for the SVG container.
 let svg;
 let gLink;
@@ -214,12 +212,14 @@ function computeWeights(node) {
 // Returns total height (sum of weights). Stores temporary properties
 // height and y in node objects keyed by id.
 function assignSidePositions(node, depth, yStart, posMap) {
-  const current = { depth, y: 0, height: 0 };
+  const current = { depth, y: 0, height: 0, top: 0, bottom: 0 };
   posMap[node.id] = current;
   const nodeHeight = getNodeLayoutHeight(node);
   if (!node.children || node.children.length === 0) {
     current.height = nodeHeight;
-    current.y = yStart + nodeHeight / 2;
+    current.top = yStart;
+    current.bottom = yStart + nodeHeight;
+    current.y = current.top + nodeHeight / 2;
     return current.height;
   }
   let y = yStart;
@@ -243,13 +243,17 @@ function assignSidePositions(node, depth, yStart, posMap) {
       childStart += childInfo.height;
     }
   }
-  current.y = yStart + requiredHeight / 2;
+  current.top = yStart;
+  current.bottom = yStart + requiredHeight;
+  current.y = current.top + requiredHeight / 2;
   return current.height;
 }
 
 function shiftSubtree(node, posMap, delta) {
   const info = posMap[node.id];
   info.y += delta;
+  info.top += delta;
+  info.bottom += delta;
   if (node.children && node.children.length) {
     node.children.forEach(child => shiftSubtree(child, posMap, delta));
   }
@@ -259,14 +263,20 @@ function shiftSubtree(node, posMap, delta) {
 function computePositions() {
   if (!rootNode) return {};
   const positions = {};
-  // If root has no children, just put it at origin.
+  const rootWidth = getClampedBoxWidth(rootNode);
+  const rootHeight = getClampedBoxHeight(rootNode);
+  positions[rootNode.id] = {
+    x: 0,
+    y: 0,
+    node: rootNode,
+    width: rootWidth,
+    height: rootHeight,
+    side: 'root'
+  };
   if (!rootNode.children || rootNode.children.length === 0) {
-    positions[rootNode.id] = { x: 0, y: 0, node: rootNode };
     return positions;
   }
-  // Compute weights of root's children.
   rootNode.children.forEach(child => computeWeights(child));
-  // Sort children by weight (descending) for balanced assignment.
   const sorted = [...rootNode.children].sort((a, b) => b.weight - a.weight);
   const leftChildren = [];
   const rightChildren = [];
@@ -281,53 +291,92 @@ function computePositions() {
       sumRight += child.weight;
     }
   });
-  // Assign positions for left side.
   const posLeft = {};
-  let yStartLeft = 0;
+  let totalLeftHeight = 0;
   leftChildren.forEach(child => {
-    const branchHeight = assignSidePositions(child, 0, yStartLeft, posLeft);
-    yStartLeft += branchHeight;
+    const branchHeight = assignSidePositions(child, 0, totalLeftHeight, posLeft);
+    totalLeftHeight += branchHeight;
   });
-  // Assign positions for right side.
+  centerSidePositions(posLeft, totalLeftHeight);
   const posRight = {};
-  let yStartRight = 0;
+  let totalRightHeight = 0;
   rightChildren.forEach(child => {
-    const branchHeight = assignSidePositions(child, 0, yStartRight, posRight);
-    yStartRight += branchHeight;
+    const branchHeight = assignSidePositions(child, 0, totalRightHeight, posRight);
+    totalRightHeight += branchHeight;
   });
-  // Normalise root child positions so both sides align at y=0.
-  const rootLeftY = leftChildren.length > 0 ? posLeft[leftChildren[0].id].y : 0;
-  const rootRightY = rightChildren.length > 0 ? posRight[rightChildren[0].id].y : 0;
-  // Compute final positions. Root at (0,0).
-  positions[rootNode.id] = {
-    x: 0,
-    y: 0,
-    node: rootNode,
-    height: getNodeLayoutHeight(rootNode),
-    box: getNodeBoxSize(rootNode)
-  };
-  // Process left side.
+  centerSidePositions(posRight, totalRightHeight);
   leftChildren.forEach(child => {
-    traverseAssignFinal(child, 'left', posLeft, positions, rootLeftY);
+    assignFinalPositions(child, 'left', posLeft, positions);
   });
-  // Process right side.
   rightChildren.forEach(child => {
-    traverseAssignFinal(child, 'right', posRight, positions, rootRightY);
+    assignFinalPositions(child, 'right', posRight, positions);
   });
   return positions;
 }
 
-function traverseAssignFinal(node, side, posMap, finalMap, rootY) {
+function centerSidePositions(posMap, totalHeight) {
+  if (!posMap || Object.keys(posMap).length === 0) return;
+  if (!totalHeight) return;
+  const offset = totalHeight / 2;
+  Object.values(posMap).forEach(info => {
+    info.y -= offset;
+    info.top -= offset;
+    info.bottom -= offset;
+  });
+}
+
+function assignFinalPositions(node, side, posMap, finalMap) {
   const info = posMap[node.id];
-  const yNorm = info.y - rootY;
-  const x = (info.depth + 1) * H_SPACING * (side === 'left' ? -1 : 1);
-  const y = yNorm;
-  finalMap[node.id] = { x, y, node, height: info.height, box: getNodeBoxSize(node) };
-  if (node.children) {
-    node.children.forEach(child => {
-      traverseAssignFinal(child, side, posMap, finalMap, rootY);
-    });
+  const parent = node.parent;
+  const parentPos = finalMap[parent.id];
+  const width = getClampedBoxWidth(node);
+  const height = getClampedBoxHeight(node);
+  const parentEdges = getNodeHorizontalEdges(parentPos);
+  let x;
+  if (side === 'left') {
+    x = parentEdges.left - NODE_MARGIN_X;
+  } else {
+    x = parentEdges.right + NODE_MARGIN_X;
   }
+  const entry = {
+    x,
+    y: info ? info.y : 0,
+    node,
+    width,
+    height,
+    side
+  };
+  finalMap[node.id] = entry;
+  if (node.children && node.children.length) {
+    node.children.forEach(child => assignFinalPositions(child, side, posMap, finalMap));
+  }
+}
+
+function getNodeHorizontalEdges(position) {
+  if (!position) {
+    return { left: 0, right: 0 };
+  }
+  if (position.side === 'left') {
+    return { left: position.x - position.width, right: position.x };
+  }
+  if (position.side === 'right') {
+    return { left: position.x, right: position.x + position.width };
+  }
+  return {
+    left: position.x - position.width / 2,
+    right: position.x + position.width / 2
+  };
+}
+
+function getNodeBoundingRect(position) {
+  const { left, right } = getNodeHorizontalEdges(position);
+  const halfHeight = position.height / 2;
+  return {
+    left,
+    right,
+    top: position.y - halfHeight,
+    bottom: position.y + halfHeight
+  };
 }
 
 function updateNodeSizeCache() {
@@ -372,28 +421,11 @@ function renderMindMap() {
   let minY = Infinity;
   let maxY = -Infinity;
   Object.values(positions).forEach(pos => {
-    const { x, y } = pos;
-    const width = getClampedBoxWidth(pos.node);
-    const height = getClampedBoxHeight(pos.node);
-    const halfHeight = height / 2;
-    const top = y - halfHeight;
-    const bottom = y + halfHeight;
-    if (top < minY) minY = top;
-    if (bottom > maxY) maxY = bottom;
-    const circleRadius = 10;
-    const circleLeft = x - circleRadius;
-    const circleRight = x + circleRadius;
-    let left = circleLeft;
-    let right = circleRight;
-    if (x >= 0) {
-      left = Math.min(left, x + 12);
-      right = Math.max(right, x + 12 + width);
-    } else {
-      left = Math.min(left, x - (width + 12));
-      right = Math.max(right, x - 12);
-    }
-    if (left < minX) minX = left;
-    if (right > maxX) maxX = right;
+    const bounds = getNodeBoundingRect(pos);
+    if (bounds.top < minY) minY = bounds.top;
+    if (bounds.bottom > maxY) maxY = bounds.bottom;
+    if (bounds.left < minX) minX = bounds.left;
+    if (bounds.right > maxX) maxX = bounds.right;
   });
   const rootPosition = positions[rootNode.id] || { y: 0 };
   const topSpace = rootPosition.y - minY;
@@ -413,10 +445,25 @@ function renderMindMap() {
   const links = [];
   Object.values(positions).forEach(pos => {
     const node = pos.node;
-    if (node.parent) {
-      const parentPos = positions[node.parent.id];
-      links.push({ source: parentPos, target: pos });
-    }
+    if (!node.parent) return;
+    const parentPos = positions[node.parent.id];
+    if (!parentPos) return;
+    const direction = pos.side === 'left' ? 'left' : 'right';
+    const parentEdges = getNodeHorizontalEdges(parentPos);
+    const childEdges = getNodeHorizontalEdges(pos);
+    const source = {
+      x: direction === 'left' ? parentEdges.left : parentEdges.right,
+      y: parentPos.y
+    };
+    const target = {
+      x: direction === 'left' ? childEdges.right : childEdges.left,
+      y: pos.y
+    };
+    links.push({ source, target, node, parent: parentPos.node });
+    minX = Math.min(minX, source.x, target.x);
+    maxX = Math.max(maxX, source.x, target.x);
+    minY = Math.min(minY, source.y, target.y);
+    maxY = Math.max(maxY, source.y, target.y);
   });
   // Assign colours to each top‑level branch (children of root). We'll reuse the
   // same colour for all links that belong to a branch. Compute a mapping from
@@ -445,15 +492,15 @@ function renderMindMap() {
     .y(d => d.y);
   // JOIN links (using <path> elements for curves). Use branch colour if
   // available, otherwise default to grey.
-  const linkSel = gLink.selectAll('path').data(links, d => `${d.source.node.id}-${d.target.node.id}`);
+  const linkSel = gLink.selectAll('path').data(links, d => `${d.parent.id}-${d.node.id}`);
   linkSel.enter()
     .append('path')
     .attr('fill', 'none')
     .attr('stroke-width', 2)
     .merge(linkSel)
-    .attr('d', d => linkGenerator({ source: { x: d.source.x, y: d.source.y }, target: { x: d.target.x, y: d.target.y } }))
+    .attr('d', d => linkGenerator(d))
     .attr('stroke', d => {
-      const branchId = getBranchId(d.target.node);
+      const branchId = getBranchId(d.node);
       return branchId && branchColors[branchId] ? branchColors[branchId] : '#888';
     });
   linkSel.exit().remove();
@@ -461,23 +508,13 @@ function renderMindMap() {
   const nodeValues = Object.values(positions);
   const nodeSel = gNode.selectAll('g.node').data(nodeValues, d => d.node.id);
   const nodeEnter = nodeSel.enter().append('g').attr('class', 'node');
-  // Make the entire node group focusable when clicked. Clicking the circle or empty
-  // area will focus the editable text inside the node. This improves usability on
-  // left‑side nodes where the editable div is offset to the left and might be hard
-  // to click precisely.
+  // Make the entire node group focusable when clicked. Clicking anywhere on the group
+  // will focus the editable text inside the node.
   nodeEnter.on('click', function(event, d) {
     // Prevent focus change if a text selection is already active within the node.
     // Always call focusOnNode to select the corresponding editable div.
     focusOnNode(d.node.id);
   });
-  // Append circles. Attach a click handler so that clicking the circle focuses
-  // the editable text associated with this node.
-  nodeEnter.append('circle')
-    .attr('r', 10)
-    .attr('fill', '#4a90e2')
-    .on('click', function(event, d) {
-      focusOnNode(d.node.id);
-    });
   // Append foreignObject for editable text. The width is limited by a maximum
   // value but the height grows with the content, so nodes expand naturally.
   const fo = nodeEnter.append('foreignObject')
@@ -514,20 +551,23 @@ function renderMindMap() {
   // Update positions for both enter and update selections
   nodeSel.merge(nodeEnter)
     .attr('transform', d => `translate(${d.x},${d.y})`);
-  nodeSel.merge(nodeEnter).select('circle')
-    .attr('fill', '#4a90e2');
   // Update text content and events
   nodeSel.merge(nodeEnter).select('.node-fo')
-    // Position the editable text box to the right of the circle for right‑side nodes
-    // and to the left for left‑side nodes. The offset mirrors the node width to
-    // keep spacing symmetric.
     .each(function(d) {
-      const width = getClampedBoxWidth(d.node);
-      const height = getClampedBoxHeight(d.node);
+      const width = d.width || getClampedBoxWidth(d.node);
+      const height = d.height || getClampedBoxHeight(d.node);
+      let offsetX;
+      if (d.side === 'left') {
+        offsetX = -width;
+      } else if (d.side === 'right') {
+        offsetX = 0;
+      } else {
+        offsetX = -width / 2;
+      }
       d3.select(this)
         .attr('width', width)
         .attr('height', height)
-        .attr('x', d.x >= 0 ? 12 : -(width + 12))
+        .attr('x', offsetX)
         .attr('y', -(height / 2));
     });
   nodeSel.merge(nodeEnter).select('.node-text')
@@ -535,6 +575,14 @@ function renderMindMap() {
       const div = this;
       div.textContent = d.node.text;
       div.dataset.nodeId = d.node.id;
+    })
+    .classed('side-left', d => d.side === 'left')
+    .classed('side-right', d => d.side === 'right')
+    .classed('side-root', d => d.side === 'root')
+    .style('text-align', d => {
+      if (d.side === 'left') return 'right';
+      if (d.side === 'right') return 'left';
+      return 'center';
     })
     .on('keydown', function(event, d) {
        const id = this.dataset.nodeId;
@@ -702,6 +750,7 @@ async function importMindFile(file) {
     nextId = 0;
     const parsed = parseMarkdown(markdown);
     if (parsed) {
+      nodeSizeCache.clear();
       rootNode = parsed;
       renderMindMap();
     }
@@ -720,6 +769,7 @@ function importTextFile(file) {
     nextId = 0;
     const parsed = parseMarkdown(text);
     if (parsed) {
+      nodeSizeCache.clear();
       rootNode = parsed;
       renderMindMap();
     }
@@ -793,6 +843,7 @@ async function handleLoad() {
   nextId = 0;
   const parsed = parseMarkdown(record.content);
   if (parsed) {
+    nodeSizeCache.clear();
     rootNode = parsed;
     renderMindMap();
   }
@@ -845,6 +896,7 @@ async function init() {
   await refreshSavedList();
   // Initialise a default root node.
   nextId = 0;
+  nodeSizeCache.clear();
   rootNode = createNode('Central Topic', null);
   renderMindMap();
 }
