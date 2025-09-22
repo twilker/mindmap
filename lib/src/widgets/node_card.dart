@@ -33,6 +33,14 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _controller = TextEditingController(text: widget.data.node.text);
     _focusNode = FocusNode();
     _focusNode.onKeyEvent = _handleKeyEvent;
+    if (widget.isSelected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _focusNode.hasFocus) {
+          return;
+        }
+        _focusNode.requestFocus();
+      });
+    }
   }
 
   @override
@@ -48,7 +56,9 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     if (widget.data.node.text != _controller.text) {
       _controller.value = TextEditingValue(
         text: widget.data.node.text,
-        selection: TextSelection.collapsed(offset: widget.data.node.text.length),
+        selection: TextSelection.collapsed(
+          offset: widget.data.node.text.length,
+        ),
       );
     }
     if (widget.isSelected && !_focusNode.hasFocus) {
@@ -63,8 +73,13 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
       return KeyEventResult.ignored;
     }
     final logicalKey = event.logicalKey;
-    final isShiftPressed = HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
-        HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
+    final isShiftPressed =
+        HardwareKeyboard.instance.logicalKeysPressed.contains(
+          LogicalKeyboardKey.shiftLeft,
+        ) ||
+        HardwareKeyboard.instance.logicalKeysPressed.contains(
+          LogicalKeyboardKey.shiftRight,
+        );
     final notifier = ref.read(mindMapProvider.notifier);
     final id = widget.data.node.id;
     if (logicalKey == LogicalKeyboardKey.enter && !isShiftPressed) {
@@ -80,6 +95,9 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
 
   void _handleTap() {
     ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
+    if (!_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
   }
 
   void _handleChanged(String value) {
@@ -87,7 +105,9 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
       return;
     }
     _updating = true;
-    ref.read(mindMapProvider.notifier).updateNodeText(widget.data.node.id, value);
+    ref
+        .read(mindMapProvider.notifier)
+        .updateNodeText(widget.data.node.id, value);
     _updating = false;
   }
 
@@ -101,9 +121,16 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: highlight, width: widget.isSelected ? 2 : 1),
+          border: Border.all(
+            color: highlight,
+            width: widget.isSelected ? 2 : 1,
+          ),
           boxShadow: [
-            BoxShadow(color: shadowColor, blurRadius: 8, offset: const Offset(0, 4)),
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Padding(
@@ -121,7 +148,10 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
             keyboardType: TextInputType.multiline,
             textAlign: TextAlign.center,
             style: textStyle,
-            decoration: const InputDecoration(border: InputBorder.none, isCollapsed: true),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isCollapsed: true,
+            ),
           ),
         ),
       ),
