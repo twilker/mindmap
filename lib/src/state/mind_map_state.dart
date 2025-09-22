@@ -9,7 +9,9 @@ import '../utils/markdown_converter.dart';
 const _defaultRootText = 'Central Topic';
 const _defaultNodeText = 'New Idea';
 
-final mindMapProvider = StateNotifierProvider<MindMapNotifier, MindMapState>((ref) {
+final mindMapProvider = StateNotifierProvider<MindMapNotifier, MindMapState>((
+  ref,
+) {
   return MindMapNotifier();
 });
 
@@ -41,15 +43,15 @@ class MindMapState {
       markdown: markdown ?? this.markdown,
       selectedNodeId: selectedNodeId ?? this.selectedNodeId,
       autoFitVersion: autoFitVersion ?? this.autoFitVersion,
-      lastContentBounds: updateBounds ? lastContentBounds : this.lastContentBounds,
+      lastContentBounds: updateBounds
+          ? lastContentBounds
+          : this.lastContentBounds,
     );
   }
 }
 
 class MindMapNotifier extends StateNotifier<MindMapState> {
-  MindMapNotifier()
-      : _uuid = const Uuid(),
-        super(_initialState()) {
+  MindMapNotifier() : _uuid = const Uuid(), super(_initialState()) {
     _converter = MindMapMarkdownConverter(_nextId);
     final markdown = _converter.toMarkdown(state.root);
     state = state.copyWith(markdown: markdown, selectedNodeId: state.root.id);
@@ -60,7 +62,11 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
 
   static MindMapState _initialState() {
     final uuid = const Uuid();
-    final root = MindMapNode(id: uuid.v4(), text: _defaultRootText, children: const []);
+    final root = MindMapNode(
+      id: uuid.v4(),
+      text: _defaultRootText,
+      children: const [],
+    );
     return MindMapState(
       root: root,
       markdown: '',
@@ -71,7 +77,8 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
 
   String _nextId() => _uuid.v4();
 
-  MindMapNode _createNode(String text) => MindMapNode(id: _nextId(), text: text, children: const []);
+  MindMapNode _createNode(String text) =>
+      MindMapNode(id: _nextId(), text: text, children: const []);
 
   void selectNode(String id) {
     if (_findNode(state.root, id) == null) {
@@ -81,7 +88,11 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
   }
 
   void updateNodeText(String id, String text) {
-    final result = _replaceNode(state.root, id, (node) => node.copyWith(text: text));
+    final result = _replaceNode(
+      state.root,
+      id,
+      (node) => node.copyWith(text: text),
+    );
     if (!result.modified) {
       return;
     }
@@ -107,11 +118,17 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
   String? addChild(String parentId) {
     final newNode = _createNode(_defaultNodeText);
     if (state.root.id == parentId) {
-      final newRoot = state.root.copyWith(children: [...state.root.children, newNode]);
+      final newRoot = state.root.copyWith(
+        children: [...state.root.children, newNode],
+      );
       _updateState(newRoot, selectedId: newNode.id);
       return newNode.id;
     }
-    final result = _updateChildren(state.root, parentId, (children) => [...children, newNode]);
+    final result = _updateChildren(
+      state.root,
+      parentId,
+      (children) => [...children, newNode],
+    );
     if (!result.modified) {
       return null;
     }
@@ -125,7 +142,12 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
       return;
     }
     _converter = MindMapMarkdownConverter(_nextId);
-    _updateState(parsed, selectedId: parsed.id, autoFit: true, resetBounds: true);
+    _updateState(
+      parsed,
+      selectedId: parsed.id,
+      autoFit: true,
+      resetBounds: true,
+    );
   }
 
   void setRoot(MindMapNode root) {
@@ -139,6 +161,10 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
   }
 
   void updateContentBounds(Rect bounds) {
+    final current = state.lastContentBounds;
+    if (current != null && _rectEquals(current, bounds)) {
+      return;
+    }
     state = state.copyWith(lastContentBounds: bounds, updateBounds: true);
   }
 
@@ -163,7 +189,8 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
   }) {
     final markdown = _converter.toMarkdown(root);
     final selection = selectedId ?? state.selectedNodeId;
-    final hasSelection = selection != null && _findNode(root, selection) != null;
+    final hasSelection =
+        selection != null && _findNode(root, selection) != null;
     state = state.copyWith(
       root: root,
       markdown: markdown,
@@ -203,7 +230,10 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
     List<MindMapNode> Function(List<MindMapNode> children) transform,
   ) {
     if (current.id == parentId) {
-      return _MutateResult(current.copyWith(children: transform(current.children)), true);
+      return _MutateResult(
+        current.copyWith(children: transform(current.children)),
+        true,
+      );
     }
     var changed = false;
     final updatedChildren = <MindMapNode>[];
@@ -220,7 +250,11 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
     return _MutateResult(current, false);
   }
 
-  _MutateResult _insertSibling(MindMapNode current, String targetId, MindMapNode sibling) {
+  _MutateResult _insertSibling(
+    MindMapNode current,
+    String targetId,
+    MindMapNode sibling,
+  ) {
     final children = current.children;
     final updatedChildren = <MindMapNode>[];
     var changed = false;
@@ -249,6 +283,14 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
       return _MutateResult(current.copyWith(children: updatedChildren), true);
     }
     return _MutateResult(current, false);
+  }
+
+  bool _rectEquals(Rect a, Rect b) {
+    const epsilon = 0.5;
+    return (a.left - b.left).abs() < epsilon &&
+        (a.top - b.top).abs() < epsilon &&
+        (a.right - b.right).abs() < epsilon &&
+        (a.bottom - b.bottom).abs() < epsilon;
   }
 }
 

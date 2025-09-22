@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
+import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart';
 
 import '../models/mind_map_node.dart';
@@ -33,9 +34,11 @@ class NodeRenderData {
   final bool isLeft;
   final String? parentId;
 
-  Offset get topLeft => Offset(center.dx - size.width / 2, center.dy - size.height / 2);
+  Offset get topLeft =>
+      Offset(center.dx - size.width / 2, center.dy - size.height / 2);
 
-  Rect get rect => Rect.fromCenter(center: center, width: size.width, height: size.height);
+  Rect get rect =>
+      Rect.fromCenter(center: center, width: size.width, height: size.height);
 }
 
 class MindMapLayoutEngine {
@@ -72,7 +75,8 @@ class MindMapLayoutEngine {
     for (var index = 0; index < measuredRoot.children.length; index++) {
       branches.add(_Branch(measuredRoot.children[index], index));
     }
-    final sorted = [...branches]..sort((a, b) => b.node.totalHeight.compareTo(a.node.totalHeight));
+    final sorted = [...branches]
+      ..sort((a, b) => b.node.totalHeight.compareTo(a.node.totalHeight));
 
     final left = <_Branch>[];
     final right = <_Branch>[];
@@ -96,8 +100,11 @@ class MindMapLayoutEngine {
     for (var i = 0; i < left.length; i++) {
       final branch = left[i];
       final childCenterY = currentLeftY + branch.node.totalHeight / 2;
-      final childCenterX = rootData.center.dx -
-          (rootData.size.width / 2 + nodeHorizontalGap + branch.node.size.width / 2);
+      final childCenterX =
+          rootData.center.dx -
+          (rootData.size.width / 2 +
+              nodeHorizontalGap +
+              branch.node.size.width / 2);
       _layoutSubtree(
         branch.node,
         Offset(childCenterX, childCenterY),
@@ -117,8 +124,11 @@ class MindMapLayoutEngine {
     for (var i = 0; i < right.length; i++) {
       final branch = right[i];
       final childCenterY = currentRightY + branch.node.totalHeight / 2;
-      final childCenterX = rootData.center.dx +
-          (rootData.size.width / 2 + nodeHorizontalGap + branch.node.size.width / 2);
+      final childCenterX =
+          rootData.center.dx +
+          (rootData.size.width / 2 +
+              nodeHorizontalGap +
+              branch.node.size.width / 2);
       _layoutSubtree(
         branch.node,
         Offset(childCenterX, childCenterY),
@@ -165,7 +175,11 @@ class MindMapLayoutEngine {
       lines.add(node.text);
     }
 
-    final width = (painter.width + nodeHorizontalPadding * 2)
+    final metrics = painter.computeLineMetrics();
+    final maxLineWidth = metrics.isEmpty
+        ? painter.width
+        : metrics.fold<double>(0, (value, line) => math.max(value, line.width));
+    final width = (maxLineWidth + nodeHorizontalPadding * 2)
         .clamp(nodeMinWidth, nodeMaxWidth)
         .toDouble();
     final height = (painter.height + nodeVerticalPadding * 2)
@@ -177,8 +191,8 @@ class MindMapLayoutEngine {
     final totalHeight = children.isEmpty
         ? height
         : childrenHeight > height
-            ? childrenHeight
-            : height;
+        ? childrenHeight
+        : height;
 
     return _MeasuredNode(
       node: node,
@@ -213,13 +227,18 @@ class MindMapLayoutEngine {
       return;
     }
 
-    final blockHeight = measured.childrenHeight > 0 ? measured.childrenHeight : measured.size.height;
+    final blockHeight = measured.childrenHeight > 0
+        ? measured.childrenHeight
+        : measured.size.height;
     var currentY = center.dy - blockHeight / 2;
     for (var i = 0; i < measured.children.length; i++) {
       final child = measured.children[i];
       final childCenterY = currentY + child.totalHeight / 2;
-      final horizontal = measured.size.width / 2 + nodeHorizontalGap + child.size.width / 2;
-      final childCenterX = isLeft ? center.dx - horizontal : center.dx + horizontal;
+      final horizontal =
+          measured.size.width / 2 + nodeHorizontalGap + child.size.width / 2;
+      final childCenterX = isLeft
+          ? center.dx - horizontal
+          : center.dx + horizontal;
       _layoutSubtree(
         child,
         Offset(childCenterX, childCenterY),
