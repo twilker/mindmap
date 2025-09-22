@@ -2,19 +2,34 @@
 <html>
 <head>
   <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
+    Configure the base href dynamically so the app can be hosted from a nested
+    path such as https://marvelsofcode.com/mindmap/ while still working when
+    served from the domain root during local development.
 
     For more details:
     * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
   -->
-  <base href="$FLUTTER_BASE_HREF">
+  <base id="flutter-base-href" href="/">
+  <script>
+    (function () {
+      const baseElement = document.getElementById('flutter-base-href');
+      if (!baseElement) {
+        return;
+      }
+
+      let pathname = window.location.pathname;
+      if (!pathname.endsWith('/')) {
+        const lastSegment = pathname.substring(pathname.lastIndexOf('/') + 1);
+        if (lastSegment.includes('.')) {
+          pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+        } else {
+          pathname = pathname + '/';
+        }
+      }
+
+      baseElement.setAttribute('href', pathname);
+    })();
+  </script>
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
