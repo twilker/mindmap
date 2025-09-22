@@ -34,7 +34,7 @@ jobs:
         run: flutter test
 
       - name: Build Flutter web
-        run: flutter build web --release
+        run: flutter build web --release --base-href "/mindmap/"
 
       - name: Upload static site artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
