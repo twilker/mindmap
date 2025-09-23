@@ -151,6 +151,7 @@ class MindMapLayoutEngine {
   _MeasuredNode _measure(MindMapNode node) {
     final displayText = node.text.isEmpty ? ' ' : node.text;
     final horizontalPadding = nodeHorizontalPadding;
+    final textFieldPadding = nodeTextFieldPadding;
     final verticalPadding = nodeVerticalPadding;
     final caretMargin = nodeCaretMargin;
     final maxTextWidth = math.max(
@@ -248,7 +249,7 @@ class MindMapLayoutEngine {
       }
     }
 
-    final contentWidth = contentTextWidth + caretMargin;
+    final contentWidth = contentTextWidth;
 
     final width = math.max(
       nodeMinWidth,
@@ -256,7 +257,7 @@ class MindMapLayoutEngine {
         nodeMaxWidth,
         (contentWidth + horizontalPadding * 2).ceilToDouble(),
       ),
-    );
+    ) + textFieldPadding*2;
     final height = math.max(
       nodeMinHeight,
       (contentHeight + verticalPadding * 2).ceilToDouble(),

@@ -4,6 +4,7 @@ const double nodeMaxWidth = 240;
 const double nodeMinWidth = 80;
 const double nodeMinHeight = 44;
 const double nodeHorizontalPadding = 16;
+const double nodeTextFieldPadding = 8;
 const double nodeVerticalPadding = 12;
 const double nodeBorderWidth = 1;
 const double nodeSelectedBorderWidth = 2;
