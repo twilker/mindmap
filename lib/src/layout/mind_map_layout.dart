@@ -181,15 +181,49 @@ class MindMapLayoutEngine {
       lines.add(node.text);
     }
 
-    final maxLineWidth = metrics.isEmpty
-        ? painter.width
-        : metrics.fold<double>(0, (value, line) => math.max(value, line.width));
-    final width = (maxLineWidth + nodeHorizontalPadding * 2)
-        .clamp(nodeMinWidth, nodeMaxWidth)
-        .toDouble();
-    final height = (painter.height + nodeVerticalPadding * 2)
-        .clamp(nodeMinHeight, double.infinity)
-        .toDouble();
+    var contentWidth = painter.width;
+    var contentHeight = painter.height;
+    if (metrics.isNotEmpty) {
+      var minLeft = double.infinity;
+      var maxRight = double.negativeInfinity;
+      var minTop = double.infinity;
+      var maxBottom = double.negativeInfinity;
+      for (final line in metrics) {
+        if (line.left.isFinite) {
+          minLeft = math.min(minLeft, line.left);
+          final right = line.left + line.width;
+          if (right.isFinite) {
+            maxRight = math.max(maxRight, right);
+          }
+        }
+        final lineTop = line.baseline - line.ascent;
+        final lineBottom = line.baseline + line.descent;
+        if (lineTop.isFinite) {
+          minTop = math.min(minTop, lineTop);
+        }
+        if (lineBottom.isFinite) {
+          maxBottom = math.max(maxBottom, lineBottom);
+        }
+      }
+      if (minLeft.isFinite && maxRight.isFinite) {
+        contentWidth = math.max(contentWidth, maxRight - minLeft);
+      }
+      if (minTop.isFinite && maxBottom.isFinite) {
+        contentHeight = math.max(contentHeight, maxBottom - minTop);
+      }
+    }
+
+    final width = math.max(
+      nodeMinWidth,
+      math.min(
+        nodeMaxWidth,
+        (contentWidth + nodeHorizontalPadding * 2).ceilToDouble(),
+      ),
+    );
+    final height = math.max(
+      nodeMinHeight,
+      (contentHeight + nodeVerticalPadding * 2).ceilToDouble(),
+    );
 
     final children = node.children.map(_measure).toList();
     final childrenHeight = _stackHeight(children);

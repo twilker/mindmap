@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mindmap_app/src/layout/mind_map_layout.dart';
@@ -44,6 +45,33 @@ void main() {
       expect(root, isNotNull);
       expect(root!.lines.length, 3);
       expect(root.lines[1].trim(), isEmpty);
+    });
+
+    test('rounds measured size up to avoid clipping fractional metrics', () {
+      const text = 'ABCDE FGHIJ';
+      final style = textStyle.copyWith(fontSize: 15.3);
+      const node = MindMapNode(id: 'root', text: text);
+
+      final engine = MindMapLayoutEngine(textStyle: style);
+      final layout = engine.layout(node);
+      final root = layout.nodes[node.id];
+
+      expect(root, isNotNull);
+
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        maxLines: null,
+      )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
+
+      final innerWidth = root!.size.width - nodeHorizontalPadding * 2;
+      final innerHeight = root.size.height - nodeVerticalPadding * 2;
+
+      expect(root.size.width, equals(root.size.width.roundToDouble()));
+      expect(root.size.height, equals(root.size.height.roundToDouble()));
+      expect(innerWidth, greaterThanOrEqualTo(painter.width.ceilToDouble()));
+      expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
     });
   });
 }
