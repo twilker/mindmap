@@ -1,9 +1,53 @@
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mindmap_app/src/layout/mind_map_layout.dart';
 import 'package:mindmap_app/src/models/mind_map_node.dart';
 import 'package:mindmap_app/src/utils/constants.dart';
+
+List<String> _linesFromPainter(TextPainter painter) {
+  final plainText = painter.text?.toPlainText() ?? '';
+  final metrics = painter.computeLineMetrics();
+  if (metrics.isEmpty) {
+    return [plainText];
+  }
+  final lines = <String>[];
+  var nextStart = 0;
+  for (final line in metrics) {
+    final lineTop = line.baseline - line.ascent;
+    final lineBottom = line.baseline + line.descent;
+    final centerY =
+        lineTop.isFinite && lineBottom.isFinite ? (lineTop + lineBottom) / 2 : 0.0;
+    var centerX = painter.width / 2;
+    if (line.left.isFinite && line.width.isFinite) {
+      centerX = line.left + line.width / 2;
+    }
+    final position = painter.getPositionForOffset(Offset(centerX, centerY));
+    final range = painter.getLineBoundary(position);
+    var start = range.start;
+    var end = range.end;
+    if (start < nextStart) {
+      start = nextStart;
+    }
+    if (end < start) {
+      end = start;
+    }
+    start = start.clamp(0, plainText.length);
+    end = end.clamp(0, plainText.length);
+    final text = start < end ? plainText.substring(start, end) : '';
+    lines.add(text.replaceAll('\r', '').replaceAll('\n', '').trimRight());
+    nextStart = math.max(nextStart, end);
+    if (nextStart < plainText.length && plainText.codeUnitAt(nextStart) == 0x0A) {
+      nextStart += 1;
+    }
+  }
+  if (lines.isEmpty) {
+    return [plainText];
+  }
+  return lines;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -101,18 +145,7 @@ void main() {
       expect(metrics.length, greaterThan(1));
 
       final innerHeight = root!.size.height - verticalPadding * 2;
-      final plain = painter.text!.toPlainText();
-      final expectedLines = metrics.map((line) {
-        final lineTop = line.baseline - line.ascent;
-        final offset = Offset(line.left + 1, lineTop + 1);
-        final range = painter.getLineBoundary(
-          painter.getPositionForOffset(offset),
-        );
-        return plain
-            .substring(range.start, range.end)
-            .replaceAll('\n', '')
-            .trimRight();
-      }).toList();
+      final expectedLines = _linesFromPainter(painter);
 
       expect(root.lines, equals(expectedLines));
 
@@ -149,6 +182,31 @@ void main() {
 
       expect(innerWidth, greaterThanOrEqualTo(painter.width.ceilToDouble()));
       expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
+    });
+
+    test('captures all wrapped lines for long descriptive text', () {
+      const text =
+          'Äußere Gesundheit: Physische Fitness, ausgewogene Ernährung und ein achtsamer Lebensstil.';
+      const node = MindMapNode(id: 'root', text: text);
+
+      final engine = MindMapLayoutEngine(textStyle: textStyle);
+      final layout = engine.layout(node);
+      final root = layout.nodes[node.id];
+
+      expect(root, isNotNull);
+
+      const horizontalPadding = nodeHorizontalPadding;
+      final painter = TextPainter(
+        text: const TextSpan(text: text, style: textStyle),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        maxLines: null,
+      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2);
+
+      final expectedLines = _linesFromPainter(painter);
+      expect(root!.lines, equals(expectedLines));
+      String normalize(String value) => value.replaceAll(RegExp(r'\s+'), '');
+      expect(normalize(root.lines.join('\n')), equals(normalize(text)));
     });
   });
 }

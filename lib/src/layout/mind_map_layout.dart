@@ -171,19 +171,43 @@ class MindMapLayoutEngine {
     if (metrics.isEmpty) {
       lines.add(plainText);
     } else {
+      var nextStart = 0;
       for (final line in metrics) {
         final lineTop = line.baseline - line.ascent;
-        final dy = lineTop.isFinite ? lineTop + 0.1 : 0.0;
-        final dx = line.left.isFinite ? line.left + 0.1 : 0.0;
-        final position = painter.getPositionForOffset(Offset(dx, dy));
+        final lineBottom = line.baseline + line.descent;
+        final centerY =
+            lineTop.isFinite && lineBottom.isFinite ? (lineTop + lineBottom) / 2 : 0.0;
+        var centerX = painter.width / 2;
+        if (line.left.isFinite && line.width.isFinite) {
+          centerX = line.left + line.width / 2;
+        }
+        final position = painter.getPositionForOffset(Offset(centerX, centerY));
         final range = painter.getLineBoundary(position);
-        final start = range.start.clamp(0, plainText.length);
-        final end = range.end.clamp(0, plainText.length);
+        var start = range.start;
+        var end = range.end;
+
+        if (start < nextStart) {
+          start = nextStart;
+        }
+        if (end < start) {
+          end = start;
+        }
+
+        start = start.clamp(0, plainText.length);
+        end = end.clamp(0, plainText.length);
+
+        String lineText;
         if (end > start) {
-          final substring = plainText.substring(start, end);
-          lines.add(substring.replaceAll('\n', '').trimRight());
+          lineText = plainText.substring(start, end);
         } else {
-          lines.add('');
+          lineText = '';
+        }
+        lineText = lineText.replaceAll('\r', '').replaceAll('\n', '').trimRight();
+        lines.add(lineText);
+
+        nextStart = math.max(nextStart, end);
+        if (nextStart < plainText.length && plainText.codeUnitAt(nextStart) == 0x0A) {
+          nextStart += 1;
         }
       }
     }
