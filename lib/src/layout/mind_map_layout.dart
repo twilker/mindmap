@@ -168,7 +168,53 @@ class MindMapLayoutEngine {
 
     final plainText = painter.text?.toPlainText() ?? displayText;
     final metrics = painter.computeLineMetrics();
-    final lines = _extractLines(painter, plainText);
+    final lines = <String>[];
+    if (metrics.isEmpty) {
+      lines.add(plainText);
+    } else {
+      var nextStart = 0;
+      for (final line in metrics) {
+        final lineTop = line.baseline - line.ascent;
+        final lineBottom = line.baseline + line.descent;
+        final centerY =
+            lineTop.isFinite && lineBottom.isFinite ? (lineTop + lineBottom) / 2 : 0.0;
+        var centerX = painter.width / 2;
+        if (line.left.isFinite && line.width.isFinite) {
+          centerX = line.left + line.width / 2;
+        }
+        final position = painter.getPositionForOffset(Offset(centerX, centerY));
+        final range = painter.getLineBoundary(position);
+        var start = range.start;
+        var end = range.end;
+
+        if (start < nextStart) {
+          start = nextStart;
+        }
+        if (end < start) {
+          end = start;
+        }
+
+        start = start.clamp(0, plainText.length);
+        end = end.clamp(0, plainText.length);
+
+        String lineText;
+        if (end > start) {
+          lineText = plainText.substring(start, end);
+        } else {
+          lineText = '';
+        }
+        lineText = lineText.replaceAll('\r', '').replaceAll('\n', '').trimRight();
+        lines.add(lineText);
+
+        nextStart = math.max(nextStart, end);
+        if (nextStart < plainText.length && plainText.codeUnitAt(nextStart) == 0x0A) {
+          nextStart += 1;
+        }
+      }
+    }
+    if (lines.isEmpty) {
+      lines.add(node.text);
+    }
 
     var contentTextWidth = painter.width;
     var contentHeight = painter.height;
@@ -232,108 +278,6 @@ class MindMapLayoutEngine {
       lines: lines,
       children: children,
     );
-  }
-
-  List<String> _extractLines(TextPainter painter, String plainText) {
-    final length = plainText.length;
-    if (length == 0) {
-      return [''];
-    }
-
-    final ranges = <TextRange>[];
-    var offset = 0;
-    while (offset < length) {
-      final boundary = painter.getLineBoundary(TextPosition(offset: offset));
-      var start = math.max(boundary.start, 0);
-      var end = math.min(boundary.end, length);
-      if (start < offset) {
-        start = offset;
-      }
-      if (end <= start) {
-        end = math.min(length, start + 1);
-      }
-      ranges.add(TextRange(start: start, end: end));
-      offset = end;
-      if (offset >= length) {
-        break;
-      }
-
-      var newlineCount = 0;
-      while (offset < length) {
-        final unit = plainText.codeUnitAt(offset);
-        if (unit == 0x0D) {
-          offset++;
-          if (offset < length && plainText.codeUnitAt(offset) == 0x0A) {
-            offset++;
-          }
-          newlineCount++;
-          continue;
-        }
-        if (unit == 0x0A) {
-          offset++;
-          newlineCount++;
-          continue;
-        }
-        break;
-      }
-      if (newlineCount > 0) {
-        if (offset >= length) {
-          for (var i = 0; i < newlineCount; i++) {
-            ranges.add(TextRange(start: length, end: length));
-          }
-          break;
-        }
-        for (var i = 1; i < newlineCount; i++) {
-          ranges.add(TextRange(start: offset, end: offset));
-        }
-      }
-    }
-
-    if (ranges.isEmpty) {
-      ranges.add(TextRange(start: 0, end: length));
-    }
-
-    var trailingNewlines = 0;
-    var index = length - 1;
-    while (index >= 0) {
-      final unit = plainText.codeUnitAt(index);
-      if (unit == 0x0A) {
-        trailingNewlines++;
-        index--;
-        if (index >= 0 && plainText.codeUnitAt(index) == 0x0D) {
-          index--;
-        }
-        continue;
-      }
-      if (unit == 0x0D) {
-        trailingNewlines++;
-        index--;
-        continue;
-      }
-      break;
-    }
-
-    var existingTrailing = 0;
-    for (var i = ranges.length - 1; i >= 0; i--) {
-      final range = ranges[i];
-      if (range.start == length && range.end == length) {
-        existingTrailing++;
-      } else {
-        break;
-      }
-    }
-    for (var i = existingTrailing; i < trailingNewlines; i++) {
-      ranges.add(TextRange(start: length, end: length));
-    }
-
-    final lines = <String>[];
-    for (final range in ranges) {
-      final start = math.max(0, math.min(range.start, length));
-      final end = math.max(start, math.min(range.end, length));
-      final fragment = start < end ? plainText.substring(start, end) : '';
-      lines.add(fragment.replaceAll('\r', '').replaceAll('\n', '').trimRight());
-    }
-    return lines;
   }
 
   void _layoutSubtree(
