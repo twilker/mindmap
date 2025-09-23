@@ -42,9 +42,11 @@ class NodeRenderData {
 }
 
 class MindMapLayoutEngine {
-  MindMapLayoutEngine({required this.textStyle});
+  MindMapLayoutEngine({required this.textStyle, TextScaler? textScaler})
+      : textScaler = textScaler ?? TextScaler.noScaling;
 
   final TextStyle textStyle;
+  final TextScaler textScaler;
 
   MindMapLayoutResult layout(MindMapNode root) {
     final measuredRoot = _measure(root);
@@ -153,6 +155,7 @@ class MindMapLayoutEngine {
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
       maxLines: null,
+      textScaler: textScaler,
     )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
 
     final plainText = painter.text?.toPlainText() ?? displayText;

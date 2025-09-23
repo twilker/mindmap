@@ -84,7 +84,10 @@ class _ControlsPanelState extends ConsumerState<ControlsPanel> {
 
   void _exportSvg() {
     final state = ref.read(mindMapProvider);
-    final layout = MindMapLayoutEngine(textStyle: textStyle).layout(state.root);
+    final layout = MindMapLayoutEngine(
+      textStyle: textStyle,
+      textScaler: MediaQuery.textScalerOf(context),
+    ).layout(state.root);
     final exporter = SvgExporter(layout: layout, bounds: state.lastContentBounds ?? layout.bounds);
     final svg = exporter.build();
     _downloadText('mindmap.svg', svg, 'image/svg+xml');

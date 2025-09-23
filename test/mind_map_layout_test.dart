@@ -73,5 +73,56 @@ void main() {
       expect(innerWidth, greaterThanOrEqualTo(painter.width.ceilToDouble()));
       expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
     });
+
+    test('matches TextPainter height when text soft wraps', () {
+      const text = 'Gesundheit als Fundament';
+      const node = MindMapNode(id: 'root', text: text);
+
+      final engine = MindMapLayoutEngine(textStyle: textStyle);
+      final layout = engine.layout(node);
+      final root = layout.nodes[node.id];
+
+      expect(root, isNotNull);
+
+      final painter = TextPainter(
+        text: const TextSpan(text: text, style: textStyle),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        maxLines: null,
+      )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
+
+      final metrics = painter.computeLineMetrics();
+      expect(metrics.length, greaterThan(1));
+
+      final innerHeight = root!.size.height - nodeVerticalPadding * 2;
+
+      expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
+    });
+
+    test('respects text scaler when measuring content size', () {
+      const text = 'Grundprinzipien';
+      const node = MindMapNode(id: 'root', text: text);
+      const textScaler = TextScaler.linear(1.5);
+
+      final engine = MindMapLayoutEngine(textStyle: textStyle, textScaler: textScaler);
+      final layout = engine.layout(node);
+      final root = layout.nodes[node.id];
+
+      expect(root, isNotNull);
+
+      final painter = TextPainter(
+        text: const TextSpan(text: text, style: textStyle),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        maxLines: null,
+        textScaler: textScaler,
+      )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
+
+      final innerWidth = root!.size.width - nodeHorizontalPadding * 2;
+      final innerHeight = root.size.height - nodeVerticalPadding * 2;
+
+      expect(innerWidth, greaterThanOrEqualTo(painter.width.ceilToDouble()));
+      expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
+    });
   });
 }

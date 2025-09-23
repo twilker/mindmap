@@ -77,7 +77,10 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final mindMapState = ref.watch(mindMapProvider);
-    final layoutEngine = MindMapLayoutEngine(textStyle: textStyle);
+    final layoutEngine = MindMapLayoutEngine(
+      textStyle: textStyle,
+      textScaler: MediaQuery.textScalerOf(context),
+    );
     final layout = layoutEngine.layout(mindMapState.root);
     final origin = Offset(-layout.bounds.left + boundsMargin, -layout.bounds.top + boundsMargin);
     final contentSize = Size(
