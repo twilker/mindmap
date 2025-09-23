@@ -25,6 +25,8 @@ class MindMapEditorPage extends ConsumerStatefulWidget {
 }
 
 class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
+  late final ProviderSubscription<String?> _mapNameSubscription;
+  late final ProviderSubscription<MindMapState> _mindMapSubscription;
   String? _currentMapName;
   String? _lastSavedMarkdown;
   String? _pendingMarkdown;
@@ -36,16 +38,25 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     _currentMapName = widget.mapName;
     ref.read(currentMapNameProvider.notifier).state = widget.mapName;
     _lastSavedMarkdown = ref.read(mindMapProvider).markdown;
-    ref.listen<String?>(currentMapNameProvider, (previous, next) {
-      _currentMapName = next;
-    });
-    ref.listen<MindMapState>(mindMapProvider, (previous, next) {
-      _scheduleSave(next);
-    });
+    _mapNameSubscription = ref.listenManual<String?>(
+      currentMapNameProvider,
+      (previous, next) {
+        _currentMapName = next;
+      },
+    );
+    _mindMapSubscription = ref.listenManual<MindMapState>(
+      mindMapProvider,
+      (previous, next) {
+        _scheduleSave(next);
+      },
+    );
   }
 
   @override
   void dispose() {
+    _mapNameSubscription.close();
+    _mindMapSubscription.close();
+    _currentMapName = null;
     ref.read(currentMapNameProvider.notifier).state = null;
     super.dispose();
   }
