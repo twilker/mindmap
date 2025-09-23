@@ -123,7 +123,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: highlight,
-            width: widget.isSelected ? 2 : 1,
+            width: widget.isSelected ? nodeSelectedBorderWidth : nodeBorderWidth,
           ),
           boxShadow: [
             BoxShadow(

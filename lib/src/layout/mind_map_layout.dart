@@ -150,13 +150,16 @@ class MindMapLayoutEngine {
 
   _MeasuredNode _measure(MindMapNode node) {
     final displayText = node.text.isEmpty ? ' ' : node.text;
+    final horizontalInset = nodeHorizontalPadding + nodeSelectedBorderWidth;
+    final verticalInset = nodeVerticalPadding + nodeSelectedBorderWidth;
+
     final painter = TextPainter(
       text: TextSpan(text: displayText, style: textStyle),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
       maxLines: null,
       textScaler: textScaler,
-    )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
+    )..layout(maxWidth: nodeMaxWidth - horizontalInset * 2);
 
     final plainText = painter.text?.toPlainText() ?? displayText;
     final metrics = painter.computeLineMetrics();
@@ -220,12 +223,12 @@ class MindMapLayoutEngine {
       nodeMinWidth,
       math.min(
         nodeMaxWidth,
-        (contentWidth + nodeHorizontalPadding * 2).ceilToDouble(),
+        (contentWidth + horizontalInset * 2).ceilToDouble(),
       ),
     );
     final height = math.max(
       nodeMinHeight,
-      (contentHeight + nodeVerticalPadding * 2).ceilToDouble(),
+      (contentHeight + verticalInset * 2).ceilToDouble(),
     );
 
     final children = node.children.map(_measure).toList();

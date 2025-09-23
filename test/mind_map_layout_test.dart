@@ -58,15 +58,18 @@ void main() {
 
       expect(root, isNotNull);
 
+      final horizontalInset = nodeHorizontalPadding + nodeSelectedBorderWidth;
+      final verticalInset = nodeVerticalPadding + nodeSelectedBorderWidth;
+
       final painter = TextPainter(
         text: TextSpan(text: text, style: style),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
-      )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalInset * 2);
 
-      final innerWidth = root!.size.width - nodeHorizontalPadding * 2;
-      final innerHeight = root.size.height - nodeVerticalPadding * 2;
+      final innerWidth = root!.size.width - horizontalInset * 2;
+      final innerHeight = root.size.height - verticalInset * 2;
 
       expect(root.size.width, equals(root.size.width.roundToDouble()));
       expect(root.size.height, equals(root.size.height.roundToDouble()));
@@ -84,17 +87,20 @@ void main() {
 
       expect(root, isNotNull);
 
+      final horizontalInset = nodeHorizontalPadding + nodeSelectedBorderWidth;
+      final verticalInset = nodeVerticalPadding + nodeSelectedBorderWidth;
+
       final painter = TextPainter(
         text: const TextSpan(text: text, style: textStyle),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
-      )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalInset * 2);
 
       final metrics = painter.computeLineMetrics();
       expect(metrics.length, greaterThan(1));
 
-      final innerHeight = root!.size.height - nodeVerticalPadding * 2;
+      final innerHeight = root!.size.height - verticalInset * 2;
 
       expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
     });
@@ -110,16 +116,19 @@ void main() {
 
       expect(root, isNotNull);
 
+      final horizontalInset = nodeHorizontalPadding + nodeSelectedBorderWidth;
+      final verticalInset = nodeVerticalPadding + nodeSelectedBorderWidth;
+
       final painter = TextPainter(
         text: const TextSpan(text: text, style: textStyle),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
         textScaler: textScaler,
-      )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalInset * 2);
 
-      final innerWidth = root!.size.width - nodeHorizontalPadding * 2;
-      final innerHeight = root.size.height - nodeVerticalPadding * 2;
+      final innerWidth = root!.size.width - horizontalInset * 2;
+      final innerHeight = root.size.height - verticalInset * 2;
 
       expect(innerWidth, greaterThanOrEqualTo(painter.width.ceilToDouble()));
       expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
