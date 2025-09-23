@@ -156,26 +156,31 @@ class MindMapLayoutEngine {
     )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
 
     final plainText = painter.text?.toPlainText() ?? displayText;
+    final metrics = painter.computeLineMetrics();
     final lines = <String>[];
-    var offset = 0;
-    while (offset < plainText.length) {
-      final range = painter.getLineBoundary(TextPosition(offset: offset));
-      final start = range.start.clamp(0, plainText.length);
-      final end = range.end.clamp(0, plainText.length);
-      if (end <= start) {
-        break;
+    if (metrics.isEmpty) {
+      lines.add(plainText);
+    } else {
+      for (final line in metrics) {
+        final lineTop = line.baseline - line.ascent;
+        final dy = lineTop.isFinite ? lineTop + 0.1 : 0.0;
+        final dx = line.left.isFinite ? line.left + 0.1 : 0.0;
+        final position = painter.getPositionForOffset(Offset(dx, dy));
+        final range = painter.getLineBoundary(position);
+        final start = range.start.clamp(0, plainText.length);
+        final end = range.end.clamp(0, plainText.length);
+        if (end > start) {
+          final substring = plainText.substring(start, end);
+          lines.add(substring.replaceAll('\n', ''));
+        } else {
+          lines.add('');
+        }
       }
-      lines.add(plainText.substring(start, end));
-      if (end == plainText.length) {
-        break;
-      }
-      offset = end;
     }
     if (lines.isEmpty) {
       lines.add(node.text);
     }
 
-    final metrics = painter.computeLineMetrics();
     final maxLineWidth = metrics.isEmpty
         ? painter.width
         : metrics.fold<double>(0, (value, line) => math.max(value, line.width));
