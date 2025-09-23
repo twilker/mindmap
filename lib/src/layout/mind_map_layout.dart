@@ -152,9 +152,10 @@ class MindMapLayoutEngine {
     final displayText = node.text.isEmpty ? ' ' : node.text;
     final horizontalPadding = nodeHorizontalPadding;
     final verticalPadding = nodeVerticalPadding;
+    final caretMargin = nodeCaretMargin;
     final maxTextWidth = math.max(
       0.0,
-      nodeMaxWidth - horizontalPadding * 2,
+      nodeMaxWidth - horizontalPadding * 2 - caretMargin,
     ); // guard for tiny max widths
 
     final painter = TextPainter(
@@ -215,7 +216,7 @@ class MindMapLayoutEngine {
       lines.add(node.text);
     }
 
-    var contentWidth = painter.width;
+    var contentTextWidth = painter.width;
     var contentHeight = painter.height;
     if (metrics.isNotEmpty) {
       var minLeft = double.infinity;
@@ -240,12 +241,14 @@ class MindMapLayoutEngine {
         }
       }
       if (minLeft.isFinite && maxRight.isFinite) {
-        contentWidth = math.max(contentWidth, maxRight - minLeft);
+        contentTextWidth = math.max(contentTextWidth, maxRight - minLeft);
       }
       if (minTop.isFinite && maxBottom.isFinite) {
         contentHeight = math.max(contentHeight, maxBottom - minTop);
       }
     }
+
+    final contentWidth = contentTextWidth + caretMargin;
 
     final width = math.max(
       nodeMinWidth,

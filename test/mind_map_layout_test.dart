@@ -105,19 +105,20 @@ void main() {
       const horizontalPadding = nodeHorizontalPadding;
       const verticalPadding = nodeVerticalPadding;
 
+      const caretMargin = nodeCaretMargin;
       final painter = TextPainter(
         text: TextSpan(text: text, style: style),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
-      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2 - caretMargin);
 
       final innerWidth = root!.size.width - horizontalPadding * 2;
       final innerHeight = root.size.height - verticalPadding * 2;
 
       expect(root.size.width, equals(root.size.width.roundToDouble()));
       expect(root.size.height, equals(root.size.height.roundToDouble()));
-      expect(innerWidth, greaterThanOrEqualTo(painter.width.ceilToDouble()));
+      expect(innerWidth, greaterThanOrEqualTo(painter.width + caretMargin));
       expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
     });
 
@@ -134,12 +135,13 @@ void main() {
       const horizontalPadding = nodeHorizontalPadding;
       const verticalPadding = nodeVerticalPadding;
 
+      const caretMargin = nodeCaretMargin;
       final painter = TextPainter(
         text: const TextSpan(text: text, style: textStyle),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
-      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2 - caretMargin);
 
       final metrics = painter.computeLineMetrics();
       expect(metrics.length, greaterThan(1));
@@ -169,18 +171,19 @@ void main() {
       const horizontalPadding = nodeHorizontalPadding;
       const verticalPadding = nodeVerticalPadding;
 
+      const caretMargin = nodeCaretMargin;
       final painter = TextPainter(
         text: const TextSpan(text: text, style: textStyle),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
         textScaler: textScaler,
-      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2 - caretMargin);
 
       final innerWidth = root!.size.width - horizontalPadding * 2;
       final innerHeight = root.size.height - verticalPadding * 2;
 
-      expect(innerWidth, greaterThanOrEqualTo(painter.width.ceilToDouble()));
+      expect(innerWidth, greaterThanOrEqualTo(painter.width + caretMargin));
       expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
     });
 
@@ -196,12 +199,13 @@ void main() {
       expect(root, isNotNull);
 
       const horizontalPadding = nodeHorizontalPadding;
+      const caretMargin = nodeCaretMargin;
       final painter = TextPainter(
         text: const TextSpan(text: text, style: textStyle),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
-      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2 - caretMargin);
 
       final expectedLines = _linesFromPainter(painter);
       expect(root!.lines, equals(expectedLines));
