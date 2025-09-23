@@ -42,9 +42,11 @@ class NodeRenderData {
 }
 
 class MindMapLayoutEngine {
-  MindMapLayoutEngine({required this.textStyle});
+  MindMapLayoutEngine({required this.textStyle, TextScaler? textScaler})
+    : textScaler = textScaler ?? TextScaler.noScaling;
 
   final TextStyle textStyle;
+  final TextScaler textScaler;
 
   MindMapLayoutResult layout(MindMapNode root) {
     final measuredRoot = _measure(root);
@@ -148,43 +150,118 @@ class MindMapLayoutEngine {
 
   _MeasuredNode _measure(MindMapNode node) {
     final displayText = node.text.isEmpty ? ' ' : node.text;
+    final horizontalPadding = nodeHorizontalPadding;
+    final textFieldPadding = nodeTextFieldPadding;
+    final verticalPadding = nodeVerticalPadding;
+    final caretMargin = nodeCaretMargin;
+    final maxTextWidth = math.max(
+      0.0,
+      nodeMaxWidth - horizontalPadding * 2 - caretMargin,
+    ); // guard for tiny max widths
+
     final painter = TextPainter(
       text: TextSpan(text: displayText, style: textStyle),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
       maxLines: null,
-    )..layout(maxWidth: nodeMaxWidth - nodeHorizontalPadding * 2);
+      textScaler: textScaler,
+    )..layout(maxWidth: maxTextWidth);
 
     final plainText = painter.text?.toPlainText() ?? displayText;
+    final metrics = painter.computeLineMetrics();
     final lines = <String>[];
-    var offset = 0;
-    while (offset < plainText.length) {
-      final range = painter.getLineBoundary(TextPosition(offset: offset));
-      final start = range.start.clamp(0, plainText.length);
-      final end = range.end.clamp(0, plainText.length);
-      if (end <= start) {
-        break;
+    if (metrics.isEmpty) {
+      lines.add(plainText);
+    } else {
+      var nextStart = 0;
+      for (final line in metrics) {
+        final lineTop = line.baseline - line.ascent;
+        final lineBottom = line.baseline + line.descent;
+        final centerY =
+            lineTop.isFinite && lineBottom.isFinite ? (lineTop + lineBottom) / 2 : 0.0;
+        var centerX = painter.width / 2;
+        if (line.left.isFinite && line.width.isFinite) {
+          centerX = line.left + line.width / 2;
+        }
+        final position = painter.getPositionForOffset(Offset(centerX, centerY));
+        final range = painter.getLineBoundary(position);
+        var start = range.start;
+        var end = range.end;
+
+        if (start < nextStart) {
+          start = nextStart;
+        }
+        if (end < start) {
+          end = start;
+        }
+
+        start = start.clamp(0, plainText.length);
+        end = end.clamp(0, plainText.length);
+
+        String lineText;
+        if (end > start) {
+          lineText = plainText.substring(start, end);
+        } else {
+          lineText = '';
+        }
+        lineText = lineText.replaceAll('\r', '').replaceAll('\n', '').trimRight();
+        lines.add(lineText);
+
+        nextStart = math.max(nextStart, end);
+        if (nextStart < plainText.length && plainText.codeUnitAt(nextStart) == 0x0A) {
+          nextStart += 1;
+        }
       }
-      lines.add(plainText.substring(start, end));
-      if (end == plainText.length) {
-        break;
-      }
-      offset = end;
     }
     if (lines.isEmpty) {
       lines.add(node.text);
     }
 
-    final metrics = painter.computeLineMetrics();
-    final maxLineWidth = metrics.isEmpty
-        ? painter.width
-        : metrics.fold<double>(0, (value, line) => math.max(value, line.width));
-    final width = (maxLineWidth + nodeHorizontalPadding * 2)
-        .clamp(nodeMinWidth, nodeMaxWidth)
-        .toDouble();
-    final height = (painter.height + nodeVerticalPadding * 2)
-        .clamp(nodeMinHeight, double.infinity)
-        .toDouble();
+    var contentTextWidth = painter.width;
+    var contentHeight = painter.height;
+    if (metrics.isNotEmpty) {
+      var minLeft = double.infinity;
+      var maxRight = double.negativeInfinity;
+      var minTop = double.infinity;
+      var maxBottom = double.negativeInfinity;
+      for (final line in metrics) {
+        if (line.left.isFinite) {
+          minLeft = math.min(minLeft, line.left);
+          final right = line.left + line.width;
+          if (right.isFinite) {
+            maxRight = math.max(maxRight, right);
+          }
+        }
+        final lineTop = line.baseline - line.ascent;
+        final lineBottom = line.baseline + line.descent;
+        if (lineTop.isFinite) {
+          minTop = math.min(minTop, lineTop);
+        }
+        if (lineBottom.isFinite) {
+          maxBottom = math.max(maxBottom, lineBottom);
+        }
+      }
+      if (minLeft.isFinite && maxRight.isFinite) {
+        contentTextWidth = math.max(contentTextWidth, maxRight - minLeft);
+      }
+      if (minTop.isFinite && maxBottom.isFinite) {
+        contentHeight = math.max(contentHeight, maxBottom - minTop);
+      }
+    }
+
+    final contentWidth = contentTextWidth;
+
+    final width = math.max(
+      nodeMinWidth,
+      math.min(
+        nodeMaxWidth,
+        (contentWidth + horizontalPadding * 2).ceilToDouble(),
+      ),
+    ) + textFieldPadding*2;
+    final height = math.max(
+      nodeMinHeight,
+      (contentHeight + verticalPadding * 2).ceilToDouble(),
+    );
 
     final children = node.children.map(_measure).toList();
     final childrenHeight = _stackHeight(children);
