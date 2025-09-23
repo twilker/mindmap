@@ -16,7 +16,8 @@ class MindMapStorage {
     return keys;
   }
 
-  Future<void> saveMap(String name, String markdown) => _box.put(name, markdown);
+  Future<void> saveMap(String name, String markdown) =>
+      _box.put(name, markdown);
 
   Future<String?> loadMap(String name) async => _box.get(name);
 
@@ -32,8 +33,11 @@ class SavedMapsNotifier extends StateNotifier<List<String>> {
     state = _storage.listMapNames();
   }
 
-  Future<void> save(String name, String markdown) async {
+  Future<void> save(String name, String markdown, {bool silent = false}) async {
     await _storage.saveMap(name, markdown);
+    if (silent) {
+      return;
+    }
     await refresh();
   }
 
@@ -45,7 +49,8 @@ class SavedMapsNotifier extends StateNotifier<List<String>> {
   Future<String?> load(String name) => _storage.loadMap(name);
 }
 
-final savedMapsProvider = StateNotifierProvider<SavedMapsNotifier, List<String>>((ref) {
-  final storage = ref.watch(mindMapStorageProvider);
-  return SavedMapsNotifier(storage);
-});
+final savedMapsProvider =
+    StateNotifierProvider<SavedMapsNotifier, List<String>>((ref) {
+      final storage = ref.watch(mindMapStorageProvider);
+      return SavedMapsNotifier(storage);
+    });

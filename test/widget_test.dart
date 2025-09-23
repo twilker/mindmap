@@ -23,16 +23,18 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  testWidgets('renders mind map header', (WidgetTester tester) async {
+  testWidgets('shows mind map overview header', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [mindMapStorageProvider.overrideWithValue(MindMapStorage(box))],
+        overrides: [
+          mindMapStorageProvider.overrideWithValue(MindMapStorage(box)),
+        ],
         child: const MindMapApp(),
       ),
     );
 
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('Mind Map Editor'), findsWidgets);
+    expect(find.text('Your mind maps'), findsOneWidget);
   });
 }
