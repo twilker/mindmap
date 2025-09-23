@@ -58,18 +58,18 @@ void main() {
 
       expect(root, isNotNull);
 
-      final horizontalInset = nodeHorizontalPadding + nodeSelectedBorderWidth;
-      final verticalInset = nodeVerticalPadding + nodeSelectedBorderWidth;
+      const horizontalPadding = nodeHorizontalPadding;
+      const verticalPadding = nodeVerticalPadding;
 
       final painter = TextPainter(
         text: TextSpan(text: text, style: style),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
-      )..layout(maxWidth: nodeMaxWidth - horizontalInset * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2);
 
-      final innerWidth = root!.size.width - horizontalInset * 2;
-      final innerHeight = root.size.height - verticalInset * 2;
+      final innerWidth = root!.size.width - horizontalPadding * 2;
+      final innerHeight = root.size.height - verticalPadding * 2;
 
       expect(root.size.width, equals(root.size.width.roundToDouble()));
       expect(root.size.height, equals(root.size.height.roundToDouble()));
@@ -87,20 +87,34 @@ void main() {
 
       expect(root, isNotNull);
 
-      final horizontalInset = nodeHorizontalPadding + nodeSelectedBorderWidth;
-      final verticalInset = nodeVerticalPadding + nodeSelectedBorderWidth;
+      const horizontalPadding = nodeHorizontalPadding;
+      const verticalPadding = nodeVerticalPadding;
 
       final painter = TextPainter(
         text: const TextSpan(text: text, style: textStyle),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: null,
-      )..layout(maxWidth: nodeMaxWidth - horizontalInset * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2);
 
       final metrics = painter.computeLineMetrics();
       expect(metrics.length, greaterThan(1));
 
-      final innerHeight = root!.size.height - verticalInset * 2;
+      final innerHeight = root!.size.height - verticalPadding * 2;
+      final plain = painter.text!.toPlainText();
+      final expectedLines = metrics.map((line) {
+        final lineTop = line.baseline - line.ascent;
+        final offset = Offset(line.left + 1, lineTop + 1);
+        final range = painter.getLineBoundary(
+          painter.getPositionForOffset(offset),
+        );
+        return plain
+            .substring(range.start, range.end)
+            .replaceAll('\n', '')
+            .trimRight();
+      }).toList();
+
+      expect(root.lines, equals(expectedLines));
 
       expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));
     });
@@ -110,14 +124,17 @@ void main() {
       const node = MindMapNode(id: 'root', text: text);
       const textScaler = TextScaler.linear(1.5);
 
-      final engine = MindMapLayoutEngine(textStyle: textStyle, textScaler: textScaler);
+      final engine = MindMapLayoutEngine(
+        textStyle: textStyle,
+        textScaler: textScaler,
+      );
       final layout = engine.layout(node);
       final root = layout.nodes[node.id];
 
       expect(root, isNotNull);
 
-      final horizontalInset = nodeHorizontalPadding + nodeSelectedBorderWidth;
-      final verticalInset = nodeVerticalPadding + nodeSelectedBorderWidth;
+      const horizontalPadding = nodeHorizontalPadding;
+      const verticalPadding = nodeVerticalPadding;
 
       final painter = TextPainter(
         text: const TextSpan(text: text, style: textStyle),
@@ -125,10 +142,10 @@ void main() {
         textDirection: TextDirection.ltr,
         maxLines: null,
         textScaler: textScaler,
-      )..layout(maxWidth: nodeMaxWidth - horizontalInset * 2);
+      )..layout(maxWidth: nodeMaxWidth - horizontalPadding * 2);
 
-      final innerWidth = root!.size.width - horizontalInset * 2;
-      final innerHeight = root.size.height - verticalInset * 2;
+      final innerWidth = root!.size.width - horizontalPadding * 2;
+      final innerHeight = root.size.height - verticalPadding * 2;
 
       expect(innerWidth, greaterThanOrEqualTo(painter.width.ceilToDouble()));
       expect(innerHeight, greaterThanOrEqualTo(painter.height.ceilToDouble()));

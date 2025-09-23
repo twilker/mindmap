@@ -43,7 +43,7 @@ class NodeRenderData {
 
 class MindMapLayoutEngine {
   MindMapLayoutEngine({required this.textStyle, TextScaler? textScaler})
-      : textScaler = textScaler ?? TextScaler.noScaling;
+    : textScaler = textScaler ?? TextScaler.noScaling;
 
   final TextStyle textStyle;
   final TextScaler textScaler;
@@ -150,8 +150,12 @@ class MindMapLayoutEngine {
 
   _MeasuredNode _measure(MindMapNode node) {
     final displayText = node.text.isEmpty ? ' ' : node.text;
-    final horizontalInset = nodeHorizontalPadding + nodeSelectedBorderWidth;
-    final verticalInset = nodeVerticalPadding + nodeSelectedBorderWidth;
+    final horizontalPadding = nodeHorizontalPadding;
+    final verticalPadding = nodeVerticalPadding;
+    final maxTextWidth = math.max(
+      0.0,
+      nodeMaxWidth - horizontalPadding * 2,
+    ); // guard for tiny max widths
 
     final painter = TextPainter(
       text: TextSpan(text: displayText, style: textStyle),
@@ -159,7 +163,7 @@ class MindMapLayoutEngine {
       textDirection: TextDirection.ltr,
       maxLines: null,
       textScaler: textScaler,
-    )..layout(maxWidth: nodeMaxWidth - horizontalInset * 2);
+    )..layout(maxWidth: maxTextWidth);
 
     final plainText = painter.text?.toPlainText() ?? displayText;
     final metrics = painter.computeLineMetrics();
@@ -177,7 +181,7 @@ class MindMapLayoutEngine {
         final end = range.end.clamp(0, plainText.length);
         if (end > start) {
           final substring = plainText.substring(start, end);
-          lines.add(substring.replaceAll('\n', ''));
+          lines.add(substring.replaceAll('\n', '').trimRight());
         } else {
           lines.add('');
         }
@@ -223,12 +227,12 @@ class MindMapLayoutEngine {
       nodeMinWidth,
       math.min(
         nodeMaxWidth,
-        (contentWidth + horizontalInset * 2).ceilToDouble(),
+        (contentWidth + horizontalPadding * 2).ceilToDouble(),
       ),
     );
     final height = math.max(
       nodeMinHeight,
-      (contentHeight + verticalInset * 2).ceilToDouble(),
+      (contentHeight + verticalPadding * 2).ceilToDouble(),
     );
 
     final children = node.children.map(_measure).toList();
