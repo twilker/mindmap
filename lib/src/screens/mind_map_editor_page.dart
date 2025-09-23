@@ -227,12 +227,6 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
             tooltip: 'Export SVG',
             onPressed: _exportSvg,
           ),
-          IconButton(
-            icon: const Icon(Icons.center_focus_strong),
-            tooltip: 'Autofit view',
-            onPressed: () =>
-                ref.read(mindMapProvider.notifier).requestAutoFit(),
-          ),
         ],
       ),
     );

@@ -95,7 +95,12 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
-        _maybeAutoFit(mindMapState, layout, viewportSize);
+        _maybeAutoFit(
+          mindMapState,
+          layout,
+          origin,
+          viewportSize,
+        );
 
         return Stack(
           children: [
@@ -178,17 +183,26 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
     );
   }
 
-  void _maybeAutoFit(MindMapState state, MindMapLayoutResult layout, Size viewportSize) {
+  void _maybeAutoFit(
+    MindMapState state,
+    MindMapLayoutResult layout,
+    Offset origin,
+    Size viewportSize,
+  ) {
     if (_lastAutoFitVersion == state.autoFitVersion || layout.isEmpty) {
       return;
     }
     _lastAutoFitVersion = state.autoFitVersion;
-    final padded = layout.bounds.inflate(boundsMargin);
-    final scaleX = viewportSize.width / padded.width;
-    final scaleY = viewportSize.height / padded.height;
+    final padded = layout.bounds.inflate(boundsMargin).shift(origin);
+    final paddedWidth = padded.width <= 0 ? 1.0 : padded.width;
+    final paddedHeight = padded.height <= 0 ? 1.0 : padded.height;
+    final scaleX = viewportSize.width / paddedWidth;
+    final scaleY = viewportSize.height / paddedHeight;
     final scale = min(scaleX, scaleY).clamp(zoomMinScale, zoomMaxScale);
-    final offsetX = -padded.left * scale + (viewportSize.width - padded.width * scale) / 2;
-    final offsetY = -padded.top * scale + (viewportSize.height - padded.height * scale) / 2;
+    final offsetX =
+        -padded.left * scale + (viewportSize.width - paddedWidth * scale) / 2;
+    final offsetY =
+        -padded.top * scale + (viewportSize.height - paddedHeight * scale) / 2;
     final matrix = Matrix4.identity()
       ..translateByVector3(vm.Vector3(offsetX, offsetY, 0))
       ..scaleByVector3(vm.Vector3(scale, scale, 1));
