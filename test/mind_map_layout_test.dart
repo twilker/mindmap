@@ -9,42 +9,103 @@ import 'package:mindmap_app/src/utils/constants.dart';
 
 List<String> _linesFromPainter(TextPainter painter) {
   final plainText = painter.text?.toPlainText() ?? '';
-  final metrics = painter.computeLineMetrics();
-  if (metrics.isEmpty) {
-    return [plainText];
+  final length = plainText.length;
+  if (length == 0) {
+    return [''];
   }
+
+  final ranges = <TextRange>[];
+  var offset = 0;
+  while (offset < length) {
+    final boundary = painter.getLineBoundary(TextPosition(offset: offset));
+    var start = math.max(boundary.start, 0);
+    var end = math.min(boundary.end, length);
+    if (start < offset) {
+      start = offset;
+    }
+    if (end <= start) {
+      end = math.min(length, start + 1);
+    }
+    ranges.add(TextRange(start: start, end: end));
+    offset = end;
+    if (offset >= length) {
+      break;
+    }
+
+    var newlineCount = 0;
+    while (offset < length) {
+      final unit = plainText.codeUnitAt(offset);
+      if (unit == 0x0D) {
+        offset++;
+        if (offset < length && plainText.codeUnitAt(offset) == 0x0A) {
+          offset++;
+        }
+        newlineCount++;
+        continue;
+      }
+      if (unit == 0x0A) {
+        offset++;
+        newlineCount++;
+        continue;
+      }
+      break;
+    }
+    if (newlineCount > 0) {
+      if (offset >= length) {
+        for (var i = 0; i < newlineCount; i++) {
+          ranges.add(TextRange(start: length, end: length));
+        }
+        break;
+      }
+      for (var i = 1; i < newlineCount; i++) {
+        ranges.add(TextRange(start: offset, end: offset));
+      }
+    }
+  }
+
+  if (ranges.isEmpty) {
+    ranges.add(TextRange(start: 0, end: length));
+  }
+
+  var trailingNewlines = 0;
+  var index = length - 1;
+  while (index >= 0) {
+    final unit = plainText.codeUnitAt(index);
+    if (unit == 0x0A) {
+      trailingNewlines++;
+      index--;
+      if (index >= 0 && plainText.codeUnitAt(index) == 0x0D) {
+        index--;
+      }
+      continue;
+    }
+    if (unit == 0x0D) {
+      trailingNewlines++;
+      index--;
+      continue;
+    }
+    break;
+  }
+
+  var existingTrailing = 0;
+  for (var i = ranges.length - 1; i >= 0; i--) {
+    final range = ranges[i];
+    if (range.start == length && range.end == length) {
+      existingTrailing++;
+    } else {
+      break;
+    }
+  }
+  for (var i = existingTrailing; i < trailingNewlines; i++) {
+    ranges.add(TextRange(start: length, end: length));
+  }
+
   final lines = <String>[];
-  var nextStart = 0;
-  for (final line in metrics) {
-    final lineTop = line.baseline - line.ascent;
-    final lineBottom = line.baseline + line.descent;
-    final centerY =
-        lineTop.isFinite && lineBottom.isFinite ? (lineTop + lineBottom) / 2 : 0.0;
-    var centerX = painter.width / 2;
-    if (line.left.isFinite && line.width.isFinite) {
-      centerX = line.left + line.width / 2;
-    }
-    final position = painter.getPositionForOffset(Offset(centerX, centerY));
-    final range = painter.getLineBoundary(position);
-    var start = range.start;
-    var end = range.end;
-    if (start < nextStart) {
-      start = nextStart;
-    }
-    if (end < start) {
-      end = start;
-    }
-    start = start.clamp(0, plainText.length);
-    end = end.clamp(0, plainText.length);
-    final text = start < end ? plainText.substring(start, end) : '';
-    lines.add(text.replaceAll('\r', '').replaceAll('\n', '').trimRight());
-    nextStart = math.max(nextStart, end);
-    if (nextStart < plainText.length && plainText.codeUnitAt(nextStart) == 0x0A) {
-      nextStart += 1;
-    }
-  }
-  if (lines.isEmpty) {
-    return [plainText];
+  for (final range in ranges) {
+    final start = math.max(0, math.min(range.start, length));
+    final end = math.max(start, math.min(range.end, length));
+    final fragment = start < end ? plainText.substring(start, end) : '';
+    lines.add(fragment.replaceAll('\r', '').replaceAll('\n', '').trimRight());
   }
   return lines;
 }
