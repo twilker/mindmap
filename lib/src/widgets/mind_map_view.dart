@@ -9,8 +9,30 @@ import '../state/mind_map_state.dart';
 import '../utils/constants.dart';
 import 'node_card.dart';
 
+class MindMapViewController {
+  _MindMapViewState? _state;
+
+  void _attach(_MindMapViewState state) {
+    _state = state;
+  }
+
+  void _detach(_MindMapViewState state) {
+    if (identical(_state, state)) {
+      _state = null;
+    }
+  }
+
+  void zoomIn() => _state?._handleExternalZoom(1.25);
+
+  void zoomOut() => _state?._handleExternalZoom(0.8);
+
+  void resetView() => _state?._resetView();
+}
+
 class MindMapView extends ConsumerStatefulWidget {
-  const MindMapView({super.key});
+  const MindMapView({super.key, this.controller});
+
+  final MindMapViewController? controller;
 
   @override
   ConsumerState<MindMapView> createState() => _MindMapViewState();
@@ -22,16 +44,28 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
   Animation<Matrix4>? _animation;
   int _lastAutoFitVersion = -1;
   Matrix4? _homeTransform;
+  Size? _viewportSize;
 
   @override
   void initState() {
     super.initState();
     _controller = TransformationController();
     _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 320));
+    widget.controller?._attach(this);
+  }
+
+  @override
+  void didUpdateWidget(covariant MindMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
   }
 
   @override
   void dispose() {
+    widget.controller?._detach(this);
     _animation?.removeListener(_applyAnimatedValue);
     _animationController.dispose();
     _controller.dispose();
@@ -74,6 +108,14 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
     }
   }
 
+  void _handleExternalZoom(double factor) {
+    final viewportSize = _viewportSize;
+    if (viewportSize == null) {
+      return;
+    }
+    _zoomBy(factor, viewportSize);
+  }
+
   @override
   Widget build(BuildContext context) {
     final mindMapState = ref.watch(mindMapProvider);
@@ -95,6 +137,7 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+        _viewportSize = viewportSize;
         _maybeAutoFit(
           mindMapState,
           layout,
@@ -102,16 +145,7 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
           viewportSize,
         );
 
-        return Stack(
-          children: [
-            _buildInteractiveViewer(layout, origin, contentSize),
-            Positioned(
-              bottom: 16,
-              right: 16,
-              child: _buildZoomControls(viewportSize),
-            ),
-          ],
-        );
+        return _buildInteractiveViewer(layout, origin, contentSize);
       },
     );
   }
@@ -151,34 +185,6 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildZoomControls(Size viewportSize) {
-    return Material(
-      color: Colors.white,
-      elevation: 6,
-      borderRadius: BorderRadius.circular(16),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.remove),
-            tooltip: 'Zoom out',
-            onPressed: () => _zoomBy(0.8, viewportSize),
-          ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            tooltip: 'Reset view',
-            onPressed: _resetView,
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Zoom in',
-            onPressed: () => _zoomBy(1.25, viewportSize),
-          ),
-        ],
       ),
     );
   }

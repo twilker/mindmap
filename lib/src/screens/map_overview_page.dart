@@ -231,6 +231,9 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
       _showMessage('Map "$name" was not found.');
       return;
     }
+    if (!mounted) {
+      return;
+    }
     ref.read(mindMapProvider.notifier).importFromMarkdown(markdown);
     ref.read(currentMapNameProvider.notifier).state = name;
     await Navigator.of(
@@ -405,7 +408,7 @@ class _MindMapCard extends StatelessWidget {
                 style: TextStyle(
                   color: Theme.of(
                     context,
-                  ).textTheme.bodySmall?.color?.withOpacity(0.7),
+                  ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                 ),
               ),
             ],
