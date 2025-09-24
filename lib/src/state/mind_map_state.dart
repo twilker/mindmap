@@ -136,6 +136,28 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
     return newNode.id;
   }
 
+  void removeNode(String nodeId) {
+    if (state.root.id == nodeId) {
+      return;
+    }
+    final parent = _findParent(state.root, nodeId);
+    if (parent == null) {
+      return;
+    }
+    final result = _updateChildren(
+      state.root,
+      parent.id,
+      (children) => [
+        for (final child in children)
+          if (child.id != nodeId) child,
+      ],
+    );
+    if (!result.modified) {
+      return;
+    }
+    _updateState(result.node, selectedId: parent.id, autoFit: true);
+  }
+
   void importFromMarkdown(String text) {
     final parsed = _converter.fromMarkdown(text);
     if (parsed == null) {
@@ -176,6 +198,19 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
       final found = _findNode(child, id);
       if (found != null) {
         return found;
+      }
+    }
+    return null;
+  }
+
+  MindMapNode? _findParent(MindMapNode node, String childId) {
+    for (final child in node.children) {
+      if (child.id == childId) {
+        return node;
+      }
+      final parent = _findParent(child, childId);
+      if (parent != null) {
+        return parent;
       }
     }
     return null;

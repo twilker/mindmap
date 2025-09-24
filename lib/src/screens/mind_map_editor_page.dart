@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +24,7 @@ class MindMapEditorPage extends ConsumerStatefulWidget {
 }
 
 class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
+  final MindMapViewController _viewController = MindMapViewController();
   late final ProviderSubscription<String?> _mapNameSubscription;
   late final ProviderSubscription<MindMapState> _mindMapSubscription;
   String? _currentMapName;
@@ -147,31 +147,60 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     final state = ref.watch(mindMapProvider);
     _lastSavedMarkdown ??= state.markdown;
     final mapName = ref.watch(currentMapNameProvider) ?? widget.mapName;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
       body: Stack(
         children: [
-          const Positioned.fill(child: MindMapView()),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: _buildHeader(mapName),
-              ),
-            ),
+          Positioned.fill(
+            child: MindMapView(controller: _viewController),
           ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Align(
-                alignment: Alignment.topRight,
-                child: _buildToolbar(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 720;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildTopBar(mapName, isCompact),
+                      const Spacer(),
+                      _buildActionBar(state, isCompact, keyboardInset),
+                    ],
+                  );
+                },
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTopBar(String mapName, bool isCompact) {
+    final header = _buildHeader(mapName);
+    final toolbar = _buildToolbar(isCompact);
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header,
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: toolbar,
+          ),
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: header),
+        const SizedBox(width: 12),
+        toolbar,
+      ],
     );
   }
 
@@ -209,25 +238,177 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
-  Widget _buildToolbar() {
+  Widget _buildToolbar(bool isCompact) {
     return Material(
       color: Colors.white,
       elevation: 6,
       borderRadius: BorderRadius.circular(16),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.file_download),
-            tooltip: 'Export text',
-            onPressed: _exportMarkdown,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          alignment: isCompact ? WrapAlignment.start : WrapAlignment.end,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.file_download),
+              tooltip: 'Export text',
+              onPressed: _exportMarkdown,
+            ),
+            IconButton(
+              icon: const Icon(Icons.image),
+              tooltip: 'Export SVG',
+              onPressed: _exportSvg,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionBar(
+    MindMapState state,
+    bool isCompact,
+    double keyboardInset,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final selectedId = state.selectedNodeId;
+    final notifier = ref.read(mindMapProvider.notifier);
+    final buttonPadding = EdgeInsets.symmetric(
+      horizontal: isCompact ? 12 : 16,
+      vertical: 12,
+    );
+    final minPrimarySize = Size(isCompact ? 130 : 150, 48);
+
+    VoidCallback? addChild;
+    VoidCallback? addSibling;
+    VoidCallback? removeNode;
+    if (selectedId != null) {
+      addChild = () {
+        notifier.addChild(selectedId);
+        notifier.requestAutoFit();
+      };
+      addSibling = () {
+        notifier.addSibling(selectedId);
+        notifier.requestAutoFit();
+      };
+      if (state.root.id != selectedId) {
+        removeNode = () => notifier.removeNode(selectedId);
+      }
+    }
+
+    final primaryActions = [
+      FilledButton.icon(
+        onPressed: addChild,
+        style: FilledButton.styleFrom(
+          padding: buttonPadding,
+          minimumSize: minPrimarySize,
+        ),
+        icon: const Icon(Icons.subdirectory_arrow_right),
+        label: const Text('Add child'),
+      ),
+      FilledButton.tonalIcon(
+        onPressed: addSibling,
+        style: FilledButton.styleFrom(
+          padding: buttonPadding,
+          minimumSize: minPrimarySize,
+        ),
+        icon: const Icon(Icons.account_tree_outlined),
+        label: const Text('Add sibling'),
+      ),
+      FilledButton.icon(
+        onPressed: removeNode,
+        style: FilledButton.styleFrom(
+          padding: buttonPadding,
+          minimumSize: minPrimarySize,
+          backgroundColor: colorScheme.error,
+          foregroundColor: colorScheme.onError,
+          disabledBackgroundColor: colorScheme.error.withValues(alpha: 0.12),
+          disabledForegroundColor: colorScheme.onSurfaceVariant,
+        ),
+        icon: const Icon(Icons.delete_outline),
+        label: const Text('Delete node'),
+      ),
+    ];
+
+    Widget utilityButton({
+      required IconData icon,
+      required String label,
+      required VoidCallback onPressed,
+    }) {
+      return OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          padding: buttonPadding,
+          minimumSize: Size(isCompact ? 120 : 140, 44),
+        ),
+      );
+    }
+
+    final utilityActions = [
+      utilityButton(
+        icon: Icons.remove,
+        label: 'Zoom out',
+        onPressed: () => _viewController.zoomOut(),
+      ),
+      utilityButton(
+        icon: Icons.aspect_ratio,
+        label: 'Auto-fit',
+        onPressed: () => notifier.requestAutoFit(),
+      ),
+      utilityButton(
+        icon: Icons.home,
+        label: 'Reset view',
+        onPressed: () => _viewController.resetView(),
+      ),
+      utilityButton(
+        icon: Icons.add,
+        label: 'Zoom in',
+        onPressed: () => _viewController.zoomIn(),
+      ),
+    ];
+
+    final bottomPadding = keyboardInset > 0 ? keyboardInset + 12 : 0.0;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Material(
+            color: theme.colorScheme.surface.withValues(alpha: 0.96),
+            elevation: 10,
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
+                    children: primaryActions,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
+                    children: utilityActions,
+                  ),
+                ],
+              ),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.image),
-            tooltip: 'Export SVG',
-            onPressed: _exportSvg,
-          ),
-        ],
+        ),
       ),
     );
   }
