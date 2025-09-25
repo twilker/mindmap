@@ -16,12 +16,9 @@ const double nodeVerticalGap = 24;
 const double zoomMinScale = 0.2;
 const double zoomMaxScale = 3.0;
 const double boundsMargin = 80;
+const double focusViewportMargin = 96;
 
-const textStyle = TextStyle(
-  fontSize: 16,
-  height: 1.3,
-  color: Colors.black87,
-);
+const textStyle = TextStyle(fontSize: 16, height: 1.3, color: Colors.black87);
 
 const List<Color> branchColors = [
   Color(0xFFF44336),

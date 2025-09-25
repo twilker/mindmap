@@ -6,6 +6,7 @@ import 'package:vector_math/vector_math_64.dart' as vm;
 
 import '../layout/mind_map_layout.dart';
 import '../state/mind_map_state.dart';
+import '../state/layout_snapshot.dart';
 import '../utils/constants.dart';
 import 'node_card.dart';
 
@@ -27,6 +28,8 @@ class MindMapViewController {
   void zoomOut() => _state?._handleExternalZoom(0.8);
 
   void resetView() => _state?._resetView();
+
+  void focusOnNode(String id) => _state?._focusOnNode(id);
 }
 
 class MindMapView extends ConsumerStatefulWidget {
@@ -38,19 +41,24 @@ class MindMapView extends ConsumerStatefulWidget {
   ConsumerState<MindMapView> createState() => _MindMapViewState();
 }
 
-class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProviderStateMixin {
+class _MindMapViewState extends ConsumerState<MindMapView>
+    with SingleTickerProviderStateMixin {
   late final TransformationController _controller;
   late final AnimationController _animationController;
   Animation<Matrix4>? _animation;
   int _lastAutoFitVersion = -1;
   Matrix4? _homeTransform;
   Size? _viewportSize;
+  String? _pendingFocusNodeId;
 
   @override
   void initState() {
     super.initState();
     _controller = TransformationController();
-    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 320));
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
     widget.controller?._attach(this);
   }
 
@@ -69,6 +77,7 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
     _animation?.removeListener(_applyAnimatedValue);
     _animationController.dispose();
     _controller.dispose();
+    ref.read(mindMapLayoutSnapshotProvider.notifier).state = null;
     super.dispose();
   }
 
@@ -82,7 +91,9 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
     _animation?.removeListener(_applyAnimatedValue);
     _animationController.stop();
     final tween = Matrix4Tween(begin: _controller.value, end: target);
-    _animation = tween.animate(CurvedAnimation(parent: _animationController, curve: Curves.easeInOut));
+    _animation = tween.animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
     _animation!.addListener(_applyAnimatedValue);
     _animationController
       ..reset()
@@ -116,6 +127,15 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
     _zoomBy(factor, viewportSize);
   }
 
+  void _focusOnNode(String id) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _pendingFocusNodeId = id;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final mindMapState = ref.watch(mindMapProvider);
@@ -124,7 +144,10 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
       textScaler: MediaQuery.textScalerOf(context),
     );
     final layout = layoutEngine.layout(mindMapState.root);
-    final origin = Offset(-layout.bounds.left + boundsMargin, -layout.bounds.top + boundsMargin);
+    final origin = Offset(
+      -layout.bounds.left + boundsMargin,
+      -layout.bounds.top + boundsMargin,
+    );
     final contentSize = Size(
       layout.bounds.width + boundsMargin * 2,
       layout.bounds.height + boundsMargin * 2,
@@ -138,20 +161,34 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
       builder: (context, constraints) {
         final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
         _viewportSize = viewportSize;
-        _maybeAutoFit(
-          mindMapState,
-          layout,
-          origin,
-          viewportSize,
-        );
+        _maybeAutoFit(mindMapState, layout, origin, viewportSize);
+        _scheduleLayoutSnapshotUpdate(layout);
+        _maybeFocusPending(layout, origin, viewportSize);
 
         return _buildInteractiveViewer(layout, origin, contentSize);
       },
     );
   }
 
-  Widget _buildInteractiveViewer(MindMapLayoutResult layout, Offset origin, Size contentSize) {
-    final selectedId = ref.watch(mindMapProvider.select((s) => s.selectedNodeId));
+  void _scheduleLayoutSnapshotUpdate(MindMapLayoutResult layout) {
+    final snapshot =
+        layout.isEmpty ? null : MindMapLayoutSnapshot(nodes: layout.nodes);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.read(mindMapLayoutSnapshotProvider.notifier).state = snapshot;
+    });
+  }
+
+  Widget _buildInteractiveViewer(
+    MindMapLayoutResult layout,
+    Offset origin,
+    Size contentSize,
+  ) {
+    final selectedId = ref.watch(
+      mindMapProvider.select((s) => s.selectedNodeId),
+    );
     final nodes = layout.nodes.values.toList();
 
     return InteractiveViewer(
@@ -179,7 +216,12 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
                   child: MindMapNodeCard(
                     data: data,
                     isSelected: data.node.id == selectedId,
-                    accentColor: branchColors[(data.branchIndex >= 0 ? data.branchIndex : 0) % branchColors.length],
+                    accentColor:
+                        branchColors[(data.branchIndex >= 0
+                                ? data.branchIndex
+                                : 0) %
+                            branchColors.length],
+                    onRequestFocusOnNode: widget.controller?.focusOnNode,
                   ),
                 ),
               ),
@@ -215,6 +257,85 @@ class _MindMapViewState extends ConsumerState<MindMapView> with SingleTickerProv
     _homeTransform = matrix.clone();
     _animateTo(matrix);
   }
+
+  void _maybeFocusPending(
+    MindMapLayoutResult layout,
+    Offset origin,
+    Size viewportSize,
+  ) {
+    final targetId = _pendingFocusNodeId;
+    if (targetId == null || layout.isEmpty) {
+      return;
+    }
+    final data = layout.nodes[targetId];
+    if (data == null) {
+      _pendingFocusNodeId = null;
+      return;
+    }
+    final matrix = _controller.value.clone();
+    final rect = Rect.fromCenter(
+      center: data.center + origin,
+      width: data.size.width,
+      height: data.size.height,
+    );
+    final transformedRect = MatrixUtils.transformRect(matrix, rect);
+    final delta = _computeFocusDelta(transformedRect, viewportSize);
+    _pendingFocusNodeId = null;
+    if (delta == Offset.zero) {
+      return;
+    }
+    final translation = matrix.getTranslation();
+    matrix.setTranslationRaw(
+      translation.x + delta.dx,
+      translation.y + delta.dy,
+      translation.z,
+    );
+    _animateTo(matrix);
+  }
+
+  Offset _computeFocusDelta(Rect rect, Size viewportSize) {
+    var dx = 0.0;
+    var dy = 0.0;
+    Rect adjusted = rect;
+
+    if (viewportSize.width <= focusViewportMargin * 2) {
+      dx = viewportSize.width / 2 - adjusted.center.dx;
+      adjusted = adjusted.shift(Offset(dx, 0));
+    } else {
+      if (adjusted.left < focusViewportMargin) {
+        final delta = focusViewportMargin - adjusted.left;
+        dx += delta;
+        adjusted = adjusted.shift(Offset(delta, 0));
+      }
+      if (adjusted.right > viewportSize.width - focusViewportMargin) {
+        final delta = viewportSize.width - focusViewportMargin - adjusted.right;
+        dx += delta;
+        adjusted = adjusted.shift(Offset(delta, 0));
+      }
+    }
+
+    if (viewportSize.height <= focusViewportMargin * 2) {
+      dy = viewportSize.height / 2 - adjusted.center.dy;
+      adjusted = adjusted.shift(Offset(0, dy));
+    } else {
+      if (adjusted.top < focusViewportMargin) {
+        final delta = focusViewportMargin - adjusted.top;
+        dy += delta;
+        adjusted = adjusted.shift(Offset(0, delta));
+      }
+      if (adjusted.bottom > viewportSize.height - focusViewportMargin) {
+        final delta =
+            viewportSize.height - focusViewportMargin - adjusted.bottom;
+        dy += delta;
+        adjusted = adjusted.shift(Offset(0, delta));
+      }
+    }
+
+    if (dx.abs() < 0.5 && dy.abs() < 0.5) {
+      return Offset.zero;
+    }
+    return Offset(dx, dy);
+  }
 }
 
 class _ConnectorPainter extends CustomPainter {
@@ -235,21 +356,29 @@ class _ConnectorPainter extends CustomPainter {
       if (parent == null) {
         continue;
       }
-      final color = branchColors[(data.branchIndex >= 0 ? data.branchIndex : 0) % branchColors.length];
+      final color =
+          branchColors[(data.branchIndex >= 0 ? data.branchIndex : 0) %
+              branchColors.length];
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0
         ..color = color.withValues(alpha: color.a * 0.85);
 
       final start = Offset(
-        parent.center.dx + origin.dx + (data.isLeft ? -parent.size.width / 2 : parent.size.width / 2),
+        parent.center.dx +
+            origin.dx +
+            (data.isLeft ? -parent.size.width / 2 : parent.size.width / 2),
         parent.center.dy + origin.dy,
       );
       final end = Offset(
-        data.center.dx + origin.dx + (data.isLeft ? data.size.width / 2 : -data.size.width / 2),
+        data.center.dx +
+            origin.dx +
+            (data.isLeft ? data.size.width / 2 : -data.size.width / 2),
         data.center.dy + origin.dy,
       );
-      final controlOffset = data.isLeft ? -nodeHorizontalGap / 2 : nodeHorizontalGap / 2;
+      final controlOffset = data.isLeft
+          ? -nodeHorizontalGap / 2
+          : nodeHorizontalGap / 2;
       final path = Path()
         ..moveTo(start.dx, start.dy)
         ..cubicTo(

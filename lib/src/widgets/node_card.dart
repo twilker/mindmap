@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../layout/mind_map_layout.dart';
+import '../state/layout_snapshot.dart';
 import '../state/mind_map_state.dart';
 import '../utils/constants.dart';
 
@@ -11,12 +12,14 @@ class MindMapNodeCard extends ConsumerStatefulWidget {
     required this.data,
     required this.isSelected,
     required this.accentColor,
+    this.onRequestFocusOnNode,
     super.key,
   });
 
   final NodeRenderData data;
   final bool isSelected;
   final Color accentColor;
+  final ValueChanged<String>? onRequestFocusOnNode;
 
   @override
   ConsumerState<MindMapNodeCard> createState() => _MindMapNodeCardState();
@@ -26,6 +29,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
   bool _updating = false;
+  bool _pendingFocusRequest = false;
 
   @override
   void initState() {
@@ -33,18 +37,15 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _controller = TextEditingController(text: widget.data.node.text);
     _focusNode = FocusNode();
     _focusNode.onKeyEvent = _handleKeyEvent;
+    _focusNode.addListener(_handleFocusChange);
     if (widget.isSelected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _focusNode.hasFocus) {
-          return;
-        }
-        _focusNode.requestFocus();
-      });
+      _scheduleFocusRequest();
     }
   }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
     _focusNode.dispose();
     _controller.dispose();
     super.dispose();
@@ -61,9 +62,9 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
         ),
       );
     }
-    if (widget.isSelected && !_focusNode.hasFocus) {
-      _focusNode.requestFocus();
-    } else if (!widget.isSelected && _focusNode.hasFocus) {
+    if (widget.isSelected) {
+      _scheduleFocusRequest();
+    } else if (_focusNode.hasFocus) {
       _focusNode.unfocus();
     }
   }
@@ -73,30 +74,140 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
       return KeyEventResult.ignored;
     }
     final logicalKey = event.logicalKey;
+    final pressed = HardwareKeyboard.instance.logicalKeysPressed;
     final isShiftPressed =
-        HardwareKeyboard.instance.logicalKeysPressed.contains(
-          LogicalKeyboardKey.shiftLeft,
-        ) ||
-        HardwareKeyboard.instance.logicalKeysPressed.contains(
-          LogicalKeyboardKey.shiftRight,
-        );
+        pressed.contains(LogicalKeyboardKey.shiftLeft) ||
+        pressed.contains(LogicalKeyboardKey.shiftRight);
+    final isAltPressed =
+        pressed.contains(LogicalKeyboardKey.altLeft) ||
+        pressed.contains(LogicalKeyboardKey.altRight) ||
+        pressed.contains(LogicalKeyboardKey.alt);
+    if (isAltPressed &&
+        (logicalKey == LogicalKeyboardKey.arrowLeft ||
+            logicalKey == LogicalKeyboardKey.arrowRight ||
+            logicalKey == LogicalKeyboardKey.arrowUp ||
+            logicalKey == LogicalKeyboardKey.arrowDown)) {
+      final targetId = _resolveNavigationTarget(logicalKey);
+      if (targetId != null && targetId != widget.data.node.id) {
+        ref.read(mindMapProvider.notifier).selectNode(targetId);
+        widget.onRequestFocusOnNode?.call(targetId);
+      }
+      return KeyEventResult.handled;
+    }
     final notifier = ref.read(mindMapProvider.notifier);
     final id = widget.data.node.id;
     if (logicalKey == LogicalKeyboardKey.enter && !isShiftPressed) {
-      notifier.addSibling(id);
+      final newId = notifier.addSibling(id);
+      if (newId != null) {
+        widget.onRequestFocusOnNode?.call(newId);
+      }
       return KeyEventResult.handled;
     }
     if (logicalKey == LogicalKeyboardKey.tab && !isShiftPressed) {
-      notifier.addChild(id);
+      final newId = notifier.addChild(id);
+      if (newId != null) {
+        widget.onRequestFocusOnNode?.call(newId);
+      }
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  String? _resolveNavigationTarget(LogicalKeyboardKey key) {
+    final snapshot = ref.read(mindMapLayoutSnapshotProvider);
+    if (snapshot == null) {
+      return null;
+    }
+    final nodes = snapshot.nodes;
+    final current = nodes[widget.data.node.id];
+    if (current == null) {
+      return null;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight) {
+      return _resolveHorizontalTarget(nodes, current, key);
+    }
+    final moveUp = key == LogicalKeyboardKey.arrowUp;
+    return _resolveVerticalTarget(nodes, current, moveUp);
+  }
+
+  String? _resolveHorizontalTarget(
+    Map<String, NodeRenderData> nodes,
+    NodeRenderData current,
+    LogicalKeyboardKey key,
+  ) {
+    if (current.parentId == null) {
+      final bool toLeft = key == LogicalKeyboardKey.arrowLeft;
+      final children = _collectChildren(
+        nodes,
+        current.node.id,
+        isLeft: toLeft ? true : false,
+      );
+      if (children.isEmpty) {
+        return null;
+      }
+      return children[children.length ~/ 2].node.id;
+    }
+
+    final bool towardsChildren =
+        (key == LogicalKeyboardKey.arrowLeft && current.isLeft) ||
+        (key == LogicalKeyboardKey.arrowRight && !current.isLeft);
+    if (towardsChildren) {
+      final children = _collectChildren(nodes, current.node.id);
+      if (children.isEmpty) {
+        return null;
+      }
+      return children[children.length ~/ 2].node.id;
+    }
+
+    return current.parentId;
+  }
+
+  String? _resolveVerticalTarget(
+    Map<String, NodeRenderData> nodes,
+    NodeRenderData current,
+    bool moveUp,
+  ) {
+    final peers = [
+      for (final candidate in nodes.values)
+        if (candidate.isLeft == current.isLeft &&
+            candidate.depth == current.depth)
+          candidate,
+    ]..sort((a, b) => a.center.dy.compareTo(b.center.dy));
+    final index = peers.indexWhere((node) => node.node.id == current.node.id);
+    if (index == -1) {
+      return null;
+    }
+    final nextIndex = moveUp ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= peers.length) {
+      return null;
+    }
+    return peers[nextIndex].node.id;
+  }
+
+  List<NodeRenderData> _collectChildren(
+    Map<String, NodeRenderData> nodes,
+    String parentId, {
+    bool? isLeft,
+  }) {
+    return [
+      for (final candidate in nodes.values)
+        if (candidate.parentId == parentId &&
+            (isLeft == null || candidate.isLeft == isLeft))
+          candidate,
+    ]..sort((a, b) => a.center.dy.compareTo(b.center.dy));
   }
 
   void _handleTap() {
     ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
+    }
+  }
+
+  void _handleFocusChange() {
+    if (_focusNode.hasFocus) {
+      ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
     }
   }
 
@@ -111,6 +222,22 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _updating = false;
   }
 
+  void _scheduleFocusRequest() {
+    if (_focusNode.hasFocus || _pendingFocusRequest) {
+      return;
+    }
+    _pendingFocusRequest = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _pendingFocusRequest = false;
+      if (widget.isSelected && !_focusNode.hasFocus) {
+        _focusNode.requestFocus();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final highlight = widget.isSelected ? widget.accentColor : Colors.black12;
@@ -123,7 +250,9 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: highlight,
-            width: widget.isSelected ? nodeSelectedBorderWidth : nodeBorderWidth,
+            width: widget.isSelected
+                ? nodeSelectedBorderWidth
+                : nodeBorderWidth,
           ),
           boxShadow: [
             BoxShadow(

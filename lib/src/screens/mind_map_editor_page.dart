@@ -38,18 +38,18 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     _currentMapName = widget.mapName;
     ref.read(currentMapNameProvider.notifier).state = widget.mapName;
     _lastSavedMarkdown = ref.read(mindMapProvider).markdown;
-    _mapNameSubscription = ref.listenManual<String?>(
-      currentMapNameProvider,
-      (previous, next) {
-        _currentMapName = next;
-      },
-    );
-    _mindMapSubscription = ref.listenManual<MindMapState>(
-      mindMapProvider,
-      (previous, next) {
-        _scheduleSave(next);
-      },
-    );
+    _mapNameSubscription = ref.listenManual<String?>(currentMapNameProvider, (
+      previous,
+      next,
+    ) {
+      _currentMapName = next;
+    });
+    _mindMapSubscription = ref.listenManual<MindMapState>(mindMapProvider, (
+      previous,
+      next,
+    ) {
+      _scheduleSave(next);
+    });
   }
 
   @override
@@ -152,59 +152,33 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(
-            child: MindMapView(controller: _viewController),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isCompact = constraints.maxWidth < 720;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildTopBar(mapName, isCompact),
-                      const Spacer(),
-                      _buildActionBar(state, isCompact, keyboardInset),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
+          Positioned.fill(child: MindMapView(controller: _viewController)),
+          _buildTopControls(mapName),
+          _buildViewControls(keyboardInset),
+          _buildNodeActionBar(state),
         ],
       ),
     );
   }
 
-  Widget _buildTopBar(String mapName, bool isCompact) {
-    final header = _buildHeader(mapName);
-    final toolbar = _buildToolbar(isCompact);
-    if (isCompact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          header,
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: toolbar,
-          ),
-        ],
-      );
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: header),
-        const SizedBox(width: 12),
-        toolbar,
-      ],
+  Widget _buildTopControls(String mapName) {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 720;
+            final header = _buildHeader(mapName, showName: !isCompact);
+            final toolbar = _buildToolbar();
+            return Row(children: [header, const Spacer(), toolbar]);
+          },
+        ),
+      ),
     );
   }
 
-  Widget _buildHeader(String mapName) {
+  Widget _buildHeader(String mapName, {required bool showName}) {
     return Material(
       color: Colors.white,
       elevation: 6,
@@ -221,24 +195,27 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
                 Navigator.of(context).pop();
               },
             ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                mapName,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+            if (showName) ...[
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Text(
+                  mapName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildToolbar(bool isCompact) {
+  Widget _buildToolbar() {
     return Material(
       color: Colors.white,
       elevation: 6,
@@ -248,7 +225,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         child: Wrap(
           spacing: 4,
           runSpacing: 4,
-          alignment: isCompact ? WrapAlignment.start : WrapAlignment.end,
+          alignment: WrapAlignment.end,
           children: [
             IconButton(
               icon: const Icon(Icons.file_download),
@@ -266,150 +243,119 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
-  Widget _buildActionBar(
-    MindMapState state,
-    bool isCompact,
-    double keyboardInset,
-  ) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final selectedId = state.selectedNodeId;
-    final notifier = ref.read(mindMapProvider.notifier);
-    final buttonPadding = EdgeInsets.symmetric(
-      horizontal: isCompact ? 12 : 16,
-      vertical: 12,
-    );
-    final minPrimarySize = Size(isCompact ? 130 : 150, 48);
-
-    VoidCallback? addChild;
-    VoidCallback? addSibling;
-    VoidCallback? removeNode;
-    if (selectedId != null) {
-      addChild = () {
-        notifier.addChild(selectedId);
-        notifier.requestAutoFit();
-      };
-      addSibling = () {
-        notifier.addSibling(selectedId);
-        notifier.requestAutoFit();
-      };
-      if (state.root.id != selectedId) {
-        removeNode = () => notifier.removeNode(selectedId);
-      }
-    }
-
-    final primaryActions = [
-      FilledButton.icon(
-        onPressed: addChild,
-        style: FilledButton.styleFrom(
-          padding: buttonPadding,
-          minimumSize: minPrimarySize,
-        ),
-        icon: const Icon(Icons.subdirectory_arrow_right),
-        label: const Text('Add child'),
-      ),
-      FilledButton.tonalIcon(
-        onPressed: addSibling,
-        style: FilledButton.styleFrom(
-          padding: buttonPadding,
-          minimumSize: minPrimarySize,
-        ),
-        icon: const Icon(Icons.account_tree_outlined),
-        label: const Text('Add sibling'),
-      ),
-      FilledButton.icon(
-        onPressed: removeNode,
-        style: FilledButton.styleFrom(
-          padding: buttonPadding,
-          minimumSize: minPrimarySize,
-          backgroundColor: colorScheme.error,
-          foregroundColor: colorScheme.onError,
-          disabledBackgroundColor: colorScheme.error.withValues(alpha: 0.12),
-          disabledForegroundColor: colorScheme.onSurfaceVariant,
-        ),
-        icon: const Icon(Icons.delete_outline),
-        label: const Text('Delete node'),
-      ),
-    ];
-
-    Widget utilityButton({
-      required IconData icon,
-      required String label,
-      required VoidCallback onPressed,
-    }) {
-      return OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          padding: buttonPadding,
-          minimumSize: Size(isCompact ? 120 : 140, 44),
-        ),
-      );
-    }
-
-    final utilityActions = [
-      utilityButton(
-        icon: Icons.remove,
-        label: 'Zoom out',
-        onPressed: () => _viewController.zoomOut(),
-      ),
-      utilityButton(
-        icon: Icons.aspect_ratio,
-        label: 'Auto-fit',
-        onPressed: () => notifier.requestAutoFit(),
-      ),
-      utilityButton(
-        icon: Icons.home,
-        label: 'Reset view',
-        onPressed: () => _viewController.resetView(),
-      ),
-      utilityButton(
-        icon: Icons.add,
-        label: 'Zoom in',
-        onPressed: () => _viewController.zoomIn(),
-      ),
-    ];
-
-    final bottomPadding = keyboardInset > 0 ? keyboardInset + 12 : 0.0;
-
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.only(bottom: bottomPadding),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: Material(
-            color: theme.colorScheme.surface.withValues(alpha: 0.96),
-            elevation: 10,
-            borderRadius: BorderRadius.circular(24),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
-                    children: primaryActions,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    alignment: isCompact ? WrapAlignment.center : WrapAlignment.start,
-                    children: utilityActions,
-                  ),
-                ],
+  Widget _buildViewControls(double keyboardInset) {
+    return SafeArea(
+      top: false,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: 16 + keyboardInset),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _floatingActionButton(
+                heroTag: 'view_zoom_in',
+                icon: Icons.zoom_in,
+                tooltip: 'Zoom in',
+                onPressed: _viewController.zoomIn,
               ),
-            ),
+              const SizedBox(width: 12),
+              _floatingActionButton(
+                heroTag: 'view_reset',
+                icon: Icons.center_focus_strong,
+                tooltip: 'Reset view',
+                onPressed: _viewController.resetView,
+              ),
+              const SizedBox(width: 12),
+              _floatingActionButton(
+                heroTag: 'view_zoom_out',
+                icon: Icons.zoom_out,
+                tooltip: 'Zoom out',
+                onPressed: _viewController.zoomOut,
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildNodeActionBar(MindMapState state) {
+    final selectedId = state.selectedNodeId;
+    if (selectedId == null) {
+      return const SizedBox.shrink();
+    }
+    final notifier = ref.read(mindMapProvider.notifier);
+    final theme = Theme.of(context);
+    final canDelete = state.root.id != selectedId;
+
+    return SafeArea(
+      top: false,
+      bottom: false,
+      left: false,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _floatingActionButton(
+                heroTag: 'node_add_child',
+                icon: Icons.subdirectory_arrow_right,
+                tooltip: 'Add child',
+                onPressed: () {
+                  final newId = notifier.addChild(selectedId);
+                  if (newId != null) {
+                    _viewController.focusOnNode(newId);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              _floatingActionButton(
+                heroTag: 'node_add_sibling',
+                icon: Icons.account_tree_outlined,
+                tooltip: 'Add sibling',
+                onPressed: () {
+                  final newId = notifier.addSibling(selectedId);
+                  if (newId != null) {
+                    _viewController.focusOnNode(newId);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              _floatingActionButton(
+                heroTag: 'node_delete',
+                icon: Icons.delete_outline,
+                tooltip: 'Delete node',
+                onPressed: canDelete
+                    ? () => notifier.removeNode(selectedId)
+                    : null,
+                backgroundColor: canDelete ? theme.colorScheme.error : null,
+                foregroundColor: canDelete ? theme.colorScheme.onError : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _floatingActionButton({
+    required String heroTag,
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onPressed,
+    Color? backgroundColor,
+    Color? foregroundColor,
+  }) {
+    return FloatingActionButton.small(
+      heroTag: heroTag,
+      onPressed: onPressed,
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      tooltip: tooltip,
+      child: Icon(icon),
     );
   }
 }
