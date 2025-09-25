@@ -250,46 +250,30 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         alignment: Alignment.bottomCenter,
         child: Padding(
           padding: EdgeInsets.only(bottom: 16 + keyboardInset),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x33000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _floatingActionButton(
-                    heroTag: 'view_zoom_in',
-                    icon: Icons.zoom_in,
-                    tooltip: 'Zoom in',
-                    onPressed: _viewController.zoomIn,
-                  ),
-                  const SizedBox(width: 12),
-                  _floatingActionButton(
-                    heroTag: 'view_reset',
-                    icon: Icons.center_focus_strong,
-                    tooltip: 'Reset view',
-                    onPressed: _viewController.resetView,
-                  ),
-                  const SizedBox(width: 12),
-                  _floatingActionButton(
-                    heroTag: 'view_zoom_out',
-                    icon: Icons.zoom_out,
-                    tooltip: 'Zoom out',
-                    onPressed: _viewController.zoomOut,
-                  ),
-                ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _floatingActionButton(
+                heroTag: 'view_zoom_in',
+                icon: Icons.zoom_in,
+                tooltip: 'Zoom in',
+                onPressed: _viewController.zoomIn,
               ),
-            ),
+              const SizedBox(width: 12),
+              _floatingActionButton(
+                heroTag: 'view_reset',
+                icon: Icons.center_focus_strong,
+                tooltip: 'Reset view',
+                onPressed: _viewController.resetView,
+              ),
+              const SizedBox(width: 12),
+              _floatingActionButton(
+                heroTag: 'view_zoom_out',
+                icon: Icons.zoom_out,
+                tooltip: 'Zoom out',
+                onPressed: _viewController.zoomOut,
+              ),
+            ],
           ),
         ),
       ),
