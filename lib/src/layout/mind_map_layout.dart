@@ -24,6 +24,7 @@ class NodeRenderData {
     required this.branchIndex,
     required this.isLeft,
     required this.parentId,
+    required this.depth,
   });
 
   final MindMapNode node;
@@ -33,6 +34,7 @@ class NodeRenderData {
   final int branchIndex;
   final bool isLeft;
   final String? parentId;
+  final int depth;
 
   Offset get topLeft =>
       Offset(center.dx - size.width / 2, center.dy - size.height / 2);
@@ -66,6 +68,7 @@ class MindMapLayoutEngine {
       branchIndex: -1,
       isLeft: false,
       parentId: null,
+      depth: 0,
     );
     addNode(rootData);
 
@@ -114,6 +117,7 @@ class MindMapLayoutEngine {
         branch.index,
         rootData.node.id,
         addNode,
+        1,
       );
       currentLeftY += branch.node.totalHeight;
       if (i < left.length - 1) {
@@ -138,6 +142,7 @@ class MindMapLayoutEngine {
         branch.index,
         rootData.node.id,
         addNode,
+        1,
       );
       currentRightY += branch.node.totalHeight;
       if (i < right.length - 1) {
@@ -177,8 +182,9 @@ class MindMapLayoutEngine {
       for (final line in metrics) {
         final lineTop = line.baseline - line.ascent;
         final lineBottom = line.baseline + line.descent;
-        final centerY =
-            lineTop.isFinite && lineBottom.isFinite ? (lineTop + lineBottom) / 2 : 0.0;
+        final centerY = lineTop.isFinite && lineBottom.isFinite
+            ? (lineTop + lineBottom) / 2
+            : 0.0;
         var centerX = painter.width / 2;
         if (line.left.isFinite && line.width.isFinite) {
           centerX = line.left + line.width / 2;
@@ -204,11 +210,15 @@ class MindMapLayoutEngine {
         } else {
           lineText = '';
         }
-        lineText = lineText.replaceAll('\r', '').replaceAll('\n', '').trimRight();
+        lineText = lineText
+            .replaceAll('\r', '')
+            .replaceAll('\n', '')
+            .trimRight();
         lines.add(lineText);
 
         nextStart = math.max(nextStart, end);
-        if (nextStart < plainText.length && plainText.codeUnitAt(nextStart) == 0x0A) {
+        if (nextStart < plainText.length &&
+            plainText.codeUnitAt(nextStart) == 0x0A) {
           nextStart += 1;
         }
       }
@@ -251,13 +261,15 @@ class MindMapLayoutEngine {
 
     final contentWidth = contentTextWidth;
 
-    final width = math.max(
-      nodeMinWidth,
-      math.min(
-        nodeMaxWidth,
-        (contentWidth + horizontalPadding * 2).ceilToDouble(),
-      ),
-    ) + textFieldPadding*2;
+    final width =
+        math.max(
+          nodeMinWidth,
+          math.min(
+            nodeMaxWidth,
+            (contentWidth + horizontalPadding * 2).ceilToDouble(),
+          ),
+        ) +
+        textFieldPadding * 2;
     final height = math.max(
       nodeMinHeight,
       (contentHeight + verticalPadding * 2).ceilToDouble(),
@@ -288,6 +300,7 @@ class MindMapLayoutEngine {
     int branchIndex,
     String parentId,
     void Function(NodeRenderData data) addNode,
+    int depth,
   ) {
     final data = NodeRenderData(
       node: measured.node,
@@ -297,6 +310,7 @@ class MindMapLayoutEngine {
       branchIndex: branchIndex,
       isLeft: isLeft,
       parentId: parentId,
+      depth: depth,
     );
     addNode(data);
 
@@ -323,6 +337,7 @@ class MindMapLayoutEngine {
         branchIndex,
         measured.node.id,
         addNode,
+        depth + 1,
       );
       currentY += child.totalHeight;
       if (i < measured.children.length - 1) {

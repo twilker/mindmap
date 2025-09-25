@@ -29,6 +29,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
   bool _updating = false;
+  bool _pendingFocusRequest = false;
 
   @override
   void initState() {
@@ -38,12 +39,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _focusNode.onKeyEvent = _handleKeyEvent;
     _focusNode.addListener(_handleFocusChange);
     if (widget.isSelected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _focusNode.hasFocus) {
-          return;
-        }
-        _focusNode.requestFocus();
-      });
+      _scheduleFocusRequest();
     }
   }
 
@@ -66,9 +62,9 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
         ),
       );
     }
-    if (widget.isSelected && !_focusNode.hasFocus) {
-      _focusNode.requestFocus();
-    } else if (!widget.isSelected && _focusNode.hasFocus) {
+    if (widget.isSelected) {
+      _scheduleFocusRequest();
+    } else if (_focusNode.hasFocus) {
       _focusNode.unfocus();
     }
   }
@@ -172,27 +168,21 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     NodeRenderData current,
     bool moveUp,
   ) {
-    final parentId = current.parentId;
-    if (parentId == null) {
-      return null;
-    }
-    final siblings = [
+    final peers = [
       for (final candidate in nodes.values)
-        if (candidate.parentId == parentId &&
-            candidate.isLeft == current.isLeft)
+        if (candidate.isLeft == current.isLeft &&
+            candidate.depth == current.depth)
           candidate,
     ]..sort((a, b) => a.center.dy.compareTo(b.center.dy));
-    final index = siblings.indexWhere(
-      (node) => node.node.id == current.node.id,
-    );
+    final index = peers.indexWhere((node) => node.node.id == current.node.id);
     if (index == -1) {
       return null;
     }
     final nextIndex = moveUp ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= siblings.length) {
+    if (nextIndex < 0 || nextIndex >= peers.length) {
       return null;
     }
-    return siblings[nextIndex].node.id;
+    return peers[nextIndex].node.id;
   }
 
   List<NodeRenderData> _collectChildren(
@@ -230,6 +220,22 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
         .read(mindMapProvider.notifier)
         .updateNodeText(widget.data.node.id, value);
     _updating = false;
+  }
+
+  void _scheduleFocusRequest() {
+    if (_focusNode.hasFocus || _pendingFocusRequest) {
+      return;
+    }
+    _pendingFocusRequest = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _pendingFocusRequest = false;
+      if (widget.isSelected && !_focusNode.hasFocus) {
+        _focusNode.requestFocus();
+      }
+    });
   }
 
   @override
