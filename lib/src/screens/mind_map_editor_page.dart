@@ -170,14 +170,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
           builder: (context, constraints) {
             final isCompact = constraints.maxWidth < 720;
             final header = _buildHeader(mapName, showName: !isCompact);
-            final toolbar = _buildToolbar(isCompact);
-            if (isCompact) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [header, const SizedBox(height: 12), toolbar],
-              );
-            }
+            final toolbar = _buildToolbar();
             return Row(children: [header, const Spacer(), toolbar]);
           },
         ),
@@ -222,7 +215,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
-  Widget _buildToolbar(bool isCompact) {
+  Widget _buildToolbar() {
     return Material(
       color: Colors.white,
       elevation: 6,
@@ -232,7 +225,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         child: Wrap(
           spacing: 4,
           runSpacing: 4,
-          alignment: isCompact ? WrapAlignment.start : WrapAlignment.end,
+          alignment: WrapAlignment.end,
           children: [
             IconButton(
               icon: const Icon(Icons.file_download),
@@ -253,35 +246,50 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
   Widget _buildViewControls(double keyboardInset) {
     return SafeArea(
       top: false,
-      left: false,
       child: Align(
-        alignment: Alignment.bottomRight,
+        alignment: Alignment.bottomCenter,
         child: Padding(
-          padding: EdgeInsets.only(right: 16, bottom: 16 + keyboardInset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _floatingActionButton(
-                heroTag: 'view_zoom_in',
-                icon: Icons.zoom_in,
-                tooltip: 'Zoom in',
-                onPressed: _viewController.zoomIn,
+          padding: EdgeInsets.only(bottom: 16 + keyboardInset),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _floatingActionButton(
+                    heroTag: 'view_zoom_in',
+                    icon: Icons.zoom_in,
+                    tooltip: 'Zoom in',
+                    onPressed: _viewController.zoomIn,
+                  ),
+                  const SizedBox(width: 12),
+                  _floatingActionButton(
+                    heroTag: 'view_reset',
+                    icon: Icons.center_focus_strong,
+                    tooltip: 'Reset view',
+                    onPressed: _viewController.resetView,
+                  ),
+                  const SizedBox(width: 12),
+                  _floatingActionButton(
+                    heroTag: 'view_zoom_out',
+                    icon: Icons.zoom_out,
+                    tooltip: 'Zoom out',
+                    onPressed: _viewController.zoomOut,
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              _floatingActionButton(
-                heroTag: 'view_reset',
-                icon: Icons.center_focus_strong,
-                tooltip: 'Reset view',
-                onPressed: _viewController.resetView,
-              ),
-              const SizedBox(height: 12),
-              _floatingActionButton(
-                heroTag: 'view_zoom_out',
-                icon: Icons.zoom_out,
-                tooltip: 'Zoom out',
-                onPressed: _viewController.zoomOut,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -313,8 +321,10 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
                 icon: Icons.subdirectory_arrow_right,
                 tooltip: 'Add child',
                 onPressed: () {
-                  notifier.addChild(selectedId);
-                  notifier.requestAutoFit();
+                  final newId = notifier.addChild(selectedId);
+                  if (newId != null) {
+                    _viewController.focusOnNode(newId);
+                  }
                 },
               ),
               const SizedBox(height: 12),
@@ -323,8 +333,10 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
                 icon: Icons.account_tree_outlined,
                 tooltip: 'Add sibling',
                 onPressed: () {
-                  notifier.addSibling(selectedId);
-                  notifier.requestAutoFit();
+                  final newId = notifier.addSibling(selectedId);
+                  if (newId != null) {
+                    _viewController.focusOnNode(newId);
+                  }
                 },
               ),
               const SizedBox(height: 12),

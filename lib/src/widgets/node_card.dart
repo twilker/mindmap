@@ -11,12 +11,14 @@ class MindMapNodeCard extends ConsumerStatefulWidget {
     required this.data,
     required this.isSelected,
     required this.accentColor,
+    this.onRequestFocusOnNode,
     super.key,
   });
 
   final NodeRenderData data;
   final bool isSelected;
   final Color accentColor;
+  final ValueChanged<String>? onRequestFocusOnNode;
 
   @override
   ConsumerState<MindMapNodeCard> createState() => _MindMapNodeCardState();
@@ -33,6 +35,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _controller = TextEditingController(text: widget.data.node.text);
     _focusNode = FocusNode();
     _focusNode.onKeyEvent = _handleKeyEvent;
+    _focusNode.addListener(_handleFocusChange);
     if (widget.isSelected) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _focusNode.hasFocus) {
@@ -45,6 +48,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
 
   @override
   void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
     _focusNode.dispose();
     _controller.dispose();
     super.dispose();
@@ -83,11 +87,17 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     final notifier = ref.read(mindMapProvider.notifier);
     final id = widget.data.node.id;
     if (logicalKey == LogicalKeyboardKey.enter && !isShiftPressed) {
-      notifier.addSibling(id);
+      final newId = notifier.addSibling(id);
+      if (newId != null) {
+        widget.onRequestFocusOnNode?.call(newId);
+      }
       return KeyEventResult.handled;
     }
     if (logicalKey == LogicalKeyboardKey.tab && !isShiftPressed) {
-      notifier.addChild(id);
+      final newId = notifier.addChild(id);
+      if (newId != null) {
+        widget.onRequestFocusOnNode?.call(newId);
+      }
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -97,6 +107,12 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
+    }
+  }
+
+  void _handleFocusChange() {
+    if (_focusNode.hasFocus) {
+      ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
     }
   }
 
@@ -123,7 +139,9 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: highlight,
-            width: widget.isSelected ? nodeSelectedBorderWidth : nodeBorderWidth,
+            width: widget.isSelected
+                ? nodeSelectedBorderWidth
+                : nodeBorderWidth,
           ),
           boxShadow: [
             BoxShadow(
