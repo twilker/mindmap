@@ -162,17 +162,23 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
         _viewportSize = viewportSize;
         _maybeAutoFit(mindMapState, layout, origin, viewportSize);
-        if (layout.isEmpty) {
-          ref.read(mindMapLayoutSnapshotProvider.notifier).state = null;
-        } else {
-          ref.read(mindMapLayoutSnapshotProvider.notifier).state =
-              MindMapLayoutSnapshot(nodes: layout.nodes);
-        }
+        _scheduleLayoutSnapshotUpdate(layout);
         _maybeFocusPending(layout, origin, viewportSize);
 
         return _buildInteractiveViewer(layout, origin, contentSize);
       },
     );
+  }
+
+  void _scheduleLayoutSnapshotUpdate(MindMapLayoutResult layout) {
+    final snapshot =
+        layout.isEmpty ? null : MindMapLayoutSnapshot(nodes: layout.nodes);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.read(mindMapLayoutSnapshotProvider.notifier).state = snapshot;
+    });
   }
 
   Widget _buildInteractiveViewer(
