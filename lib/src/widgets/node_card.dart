@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -200,6 +201,17 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
 
   void _handleTap() {
     ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
+    if (!_isTouchOnlyDevice()) {
+      _startEditing();
+    }
+  }
+
+  void _handleEditPressed() {
+    ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
+    _startEditing();
+  }
+
+  void _startEditing() {
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
     }
@@ -208,6 +220,9 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
   void _handleFocusChange() {
     if (_focusNode.hasFocus) {
       ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
+    }
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -223,7 +238,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
   }
 
   void _scheduleFocusRequest() {
-    if (_focusNode.hasFocus || _pendingFocusRequest) {
+    if (_isTouchOnlyDevice() || _focusNode.hasFocus || _pendingFocusRequest) {
       return;
     }
     _pendingFocusRequest = true;
@@ -238,51 +253,93 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     });
   }
 
+  bool _isTouchOnlyDevice() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.iOS:
+        return true;
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
+    }
+  }
+
+  bool get _showTouchEditButton {
+    if (!_isTouchOnlyDevice()) {
+      return false;
+    }
+    return widget.isSelected && !_focusNode.hasFocus;
+  }
+
   @override
   Widget build(BuildContext context) {
     final highlight = widget.isSelected ? widget.accentColor : Colors.black12;
     final shadowColor = Colors.black.withValues(alpha: Colors.black.a * 0.06);
+    final isTouchOnly = _isTouchOnlyDevice();
+    final ignoreTextInput = isTouchOnly && !_focusNode.hasFocus;
     return GestureDetector(
       onTap: _handleTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: highlight,
-            width: widget.isSelected
-                ? nodeSelectedBorderWidth
-                : nodeBorderWidth,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor,
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+      onDoubleTap: isTouchOnly ? _handleEditPressed : null,
+      child: Stack(
+        fit: StackFit.passthrough,
+        clipBehavior: Clip.none,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: highlight,
+                width: widget.isSelected
+                    ? nodeSelectedBorderWidth
+                    : nodeBorderWidth,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: shadowColor,
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: nodeHorizontalPadding,
-            vertical: nodeVerticalPadding,
-          ),
-          child: TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            onChanged: _handleChanged,
-            expands: true,
-            maxLines: null,
-            minLines: null,
-            keyboardType: TextInputType.multiline,
-            textAlign: TextAlign.center,
-            style: textStyle,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              isCollapsed: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: nodeHorizontalPadding,
+                vertical: nodeVerticalPadding,
+              ),
+              child: IgnorePointer(
+                ignoring: ignoreTextInput,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  onChanged: _handleChanged,
+                  expands: true,
+                  maxLines: null,
+                  minLines: null,
+                  keyboardType: TextInputType.multiline,
+                  textAlign: TextAlign.center,
+                  style: textStyle,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isCollapsed: true,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          if (_showTouchEditButton)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton.filledTonal(
+                onPressed: _handleEditPressed,
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Bearbeiten',
+              ),
+            ),
+        ],
       ),
     );
   }

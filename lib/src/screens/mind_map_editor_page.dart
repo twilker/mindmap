@@ -147,14 +147,13 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     final state = ref.watch(mindMapProvider);
     _lastSavedMarkdown ??= state.markdown;
     final mapName = ref.watch(currentMapNameProvider) ?? widget.mapName;
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(child: MindMapView(controller: _viewController)),
           _buildTopControls(mapName),
-          _buildViewControls(keyboardInset),
+          _buildViewControls(),
           _buildNodeActionBar(state),
         ],
       ),
@@ -243,13 +242,13 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
-  Widget _buildViewControls(double keyboardInset) {
+  Widget _buildViewControls() {
     return SafeArea(
       top: false,
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Padding(
-          padding: EdgeInsets.only(bottom: 16 + keyboardInset),
+          padding: const EdgeInsets.only(bottom: 16),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
