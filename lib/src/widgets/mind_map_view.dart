@@ -6,6 +6,7 @@ import 'package:vector_math/vector_math_64.dart' as vm;
 
 import '../layout/mind_map_layout.dart';
 import '../state/mind_map_state.dart';
+import '../state/layout_snapshot.dart';
 import '../utils/constants.dart';
 import 'node_card.dart';
 
@@ -28,8 +29,7 @@ class MindMapViewController {
 
   void resetView() => _state?._resetView();
 
-  void focusOnNode(String id, {double scale = 1.2}) =>
-      _state?._focusOnNode(id, scale: scale);
+  void focusOnNode(String id) => _state?._focusOnNode(id);
 }
 
 class MindMapView extends ConsumerStatefulWidget {
@@ -50,7 +50,6 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   Matrix4? _homeTransform;
   Size? _viewportSize;
   String? _pendingFocusNodeId;
-  double? _pendingFocusScale;
 
   @override
   void initState() {
@@ -78,6 +77,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     _animation?.removeListener(_applyAnimatedValue);
     _animationController.dispose();
     _controller.dispose();
+    ref.read(mindMapLayoutSnapshotProvider.notifier).state = null;
     super.dispose();
   }
 
@@ -127,13 +127,12 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     _zoomBy(factor, viewportSize);
   }
 
-  void _focusOnNode(String id, {double scale = 1.2}) {
+  void _focusOnNode(String id) {
     if (!mounted) {
       return;
     }
     setState(() {
       _pendingFocusNodeId = id;
-      _pendingFocusScale = scale;
     });
   }
 
@@ -163,6 +162,12 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
         _viewportSize = viewportSize;
         _maybeAutoFit(mindMapState, layout, origin, viewportSize);
+        if (layout.isEmpty) {
+          ref.read(mindMapLayoutSnapshotProvider.notifier).state = null;
+        } else {
+          ref.read(mindMapLayoutSnapshotProvider.notifier).state =
+              MindMapLayoutSnapshot(nodes: layout.nodes);
+        }
         _maybeFocusPending(layout, origin, viewportSize);
 
         return _buildInteractiveViewer(layout, origin, contentSize);
@@ -258,24 +263,72 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     }
     final data = layout.nodes[targetId];
     if (data == null) {
+      _pendingFocusNodeId = null;
       return;
     }
-    final desiredScale = (_pendingFocusScale ?? 1.2).clamp(
-      zoomMinScale,
-      zoomMaxScale,
+    final matrix = _controller.value.clone();
+    final rect = Rect.fromCenter(
+      center: data.center + origin,
+      width: data.size.width,
+      height: data.size.height,
     );
-    final center = Offset(
-      data.center.dx + origin.dx,
-      data.center.dy + origin.dy,
-    );
-    final offsetX = viewportSize.width / 2 - desiredScale * center.dx;
-    final offsetY = viewportSize.height / 2 - desiredScale * center.dy;
-    final matrix = Matrix4.identity()
-      ..translateByVector3(vm.Vector3(offsetX, offsetY, 0))
-      ..scaleByVector3(vm.Vector3(desiredScale, desiredScale, 1));
+    final transformedRect = MatrixUtils.transformRect(matrix, rect);
+    final delta = _computeFocusDelta(transformedRect, viewportSize);
     _pendingFocusNodeId = null;
-    _pendingFocusScale = null;
+    if (delta == Offset.zero) {
+      return;
+    }
+    final translation = matrix.getTranslation();
+    matrix.setTranslationRaw(
+      translation.x + delta.dx,
+      translation.y + delta.dy,
+      translation.z,
+    );
     _animateTo(matrix);
+  }
+
+  Offset _computeFocusDelta(Rect rect, Size viewportSize) {
+    var dx = 0.0;
+    var dy = 0.0;
+    Rect adjusted = rect;
+
+    if (viewportSize.width <= focusViewportMargin * 2) {
+      dx = viewportSize.width / 2 - adjusted.center.dx;
+      adjusted = adjusted.shift(Offset(dx, 0));
+    } else {
+      if (adjusted.left < focusViewportMargin) {
+        final delta = focusViewportMargin - adjusted.left;
+        dx += delta;
+        adjusted = adjusted.shift(Offset(delta, 0));
+      }
+      if (adjusted.right > viewportSize.width - focusViewportMargin) {
+        final delta = viewportSize.width - focusViewportMargin - adjusted.right;
+        dx += delta;
+        adjusted = adjusted.shift(Offset(delta, 0));
+      }
+    }
+
+    if (viewportSize.height <= focusViewportMargin * 2) {
+      dy = viewportSize.height / 2 - adjusted.center.dy;
+      adjusted = adjusted.shift(Offset(0, dy));
+    } else {
+      if (adjusted.top < focusViewportMargin) {
+        final delta = focusViewportMargin - adjusted.top;
+        dy += delta;
+        adjusted = adjusted.shift(Offset(0, delta));
+      }
+      if (adjusted.bottom > viewportSize.height - focusViewportMargin) {
+        final delta =
+            viewportSize.height - focusViewportMargin - adjusted.bottom;
+        dy += delta;
+        adjusted = adjusted.shift(Offset(0, delta));
+      }
+    }
+
+    if (dx.abs() < 0.5 && dy.abs() < 0.5) {
+      return Offset.zero;
+    }
+    return Offset(dx, dy);
   }
 }
 
