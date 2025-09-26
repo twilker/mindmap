@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,7 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../layout/mind_map_layout.dart';
 import '../state/layout_snapshot.dart';
 import '../state/mind_map_state.dart';
+import '../state/node_edit_request.dart';
 import '../utils/constants.dart';
+
+typedef FocusOnNodeCallback = void Function(String id, {bool preferTopHalf});
+
+typedef NodeEditingChangedCallback =
+    void Function(String id, bool isEditing, {bool preferTopHalf});
 
 class MindMapNodeCard extends ConsumerStatefulWidget {
   const MindMapNodeCard({
@@ -13,13 +20,15 @@ class MindMapNodeCard extends ConsumerStatefulWidget {
     required this.isSelected,
     required this.accentColor,
     this.onRequestFocusOnNode,
+    this.onEditingChanged,
     super.key,
   });
 
   final NodeRenderData data;
   final bool isSelected;
   final Color accentColor;
-  final ValueChanged<String>? onRequestFocusOnNode;
+  final FocusOnNodeCallback? onRequestFocusOnNode;
+  final NodeEditingChangedCallback? onEditingChanged;
 
   @override
   ConsumerState<MindMapNodeCard> createState() => _MindMapNodeCardState();
@@ -30,6 +39,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
   late final FocusNode _focusNode;
   bool _updating = false;
   bool _pendingFocusRequest = false;
+  late final ProviderSubscription<String?> _editRequestSubscription;
 
   @override
   void initState() {
@@ -38,6 +48,18 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _focusNode = FocusNode();
     _focusNode.onKeyEvent = _handleKeyEvent;
     _focusNode.addListener(_handleFocusChange);
+    _editRequestSubscription = ref.listenManual<String?>(
+      nodeEditRequestProvider,
+      (previous, next) {
+        if (next == widget.data.node.id) {
+          _handleEditPressed();
+          final notifier = ref.read(nodeEditRequestProvider.notifier);
+          if (notifier.state == widget.data.node.id) {
+            notifier.state = null;
+          }
+        }
+      },
+    );
     if (widget.isSelected) {
       _scheduleFocusRequest();
     }
@@ -48,6 +70,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _focusNode.removeListener(_handleFocusChange);
     _focusNode.dispose();
     _controller.dispose();
+    _editRequestSubscription.close();
     super.dispose();
   }
 
@@ -200,14 +223,37 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
 
   void _handleTap() {
     ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
+    if (!_isTouchOnlyDevice()) {
+      _startEditing();
+    }
+  }
+
+  void _handleEditPressed() {
+    ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
+    _startEditing();
+  }
+
+  void _startEditing() {
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
     }
+    widget.onRequestFocusOnNode?.call(
+      widget.data.node.id,
+      preferTopHalf: _isTouchOnlyDevice(),
+    );
   }
 
   void _handleFocusChange() {
     if (_focusNode.hasFocus) {
       ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
+    }
+    widget.onEditingChanged?.call(
+      widget.data.node.id,
+      _focusNode.hasFocus,
+      preferTopHalf: _isTouchOnlyDevice(),
+    );
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -223,7 +269,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
   }
 
   void _scheduleFocusRequest() {
-    if (_focusNode.hasFocus || _pendingFocusRequest) {
+    if (_isTouchOnlyDevice() || _focusNode.hasFocus || _pendingFocusRequest) {
       return;
     }
     _pendingFocusRequest = true;
@@ -238,51 +284,77 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     });
   }
 
+  bool _isTouchOnlyDevice() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.iOS:
+        return true;
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final highlight = widget.isSelected ? widget.accentColor : Colors.black12;
     final shadowColor = Colors.black.withValues(alpha: Colors.black.a * 0.06);
+    final isTouchOnly = _isTouchOnlyDevice();
+    final ignoreTextInput = isTouchOnly && !_focusNode.hasFocus;
     return GestureDetector(
       onTap: _handleTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: highlight,
-            width: widget.isSelected
-                ? nodeSelectedBorderWidth
-                : nodeBorderWidth,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor,
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+      onDoubleTap: _handleEditPressed,
+      onLongPress: isTouchOnly ? _handleEditPressed : null,
+      child: Stack(
+        fit: StackFit.passthrough,
+        clipBehavior: Clip.none,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: highlight,
+                width: widget.isSelected
+                    ? nodeSelectedBorderWidth
+                    : nodeBorderWidth,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: shadowColor,
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: nodeHorizontalPadding,
-            vertical: nodeVerticalPadding,
-          ),
-          child: TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            onChanged: _handleChanged,
-            expands: true,
-            maxLines: null,
-            minLines: null,
-            keyboardType: TextInputType.multiline,
-            textAlign: TextAlign.center,
-            style: textStyle,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              isCollapsed: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: nodeHorizontalPadding,
+                vertical: nodeVerticalPadding,
+              ),
+              child: IgnorePointer(
+                ignoring: ignoreTextInput,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  onChanged: _handleChanged,
+                  expands: true,
+                  maxLines: null,
+                  minLines: null,
+                  keyboardType: TextInputType.multiline,
+                  textAlign: TextAlign.center,
+                  style: textStyle,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isCollapsed: true,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
