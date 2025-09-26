@@ -23,9 +23,12 @@ class MindMapViewController {
     }
   }
 
-  void zoomIn() => _state?._handleExternalZoom(1.25);
+  static const double _zoomInFactor = 1.5;
+  static const double _zoomOutFactor = 1 / _zoomInFactor;
 
-  void zoomOut() => _state?._handleExternalZoom(0.8);
+  void zoomIn() => _state?._handleExternalZoom(_zoomInFactor);
+
+  void zoomOut() => _state?._handleExternalZoom(_zoomOutFactor);
 
   void resetView() => _state?._resetView();
 
@@ -190,7 +193,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   void _handleBackgroundDoubleTap(Offset localPosition) {
     _pendingDoubleTapPosition = null;
     _handleBackgroundTap();
-    _zoomAt(localPosition, 1.25);
+    _zoomAt(localPosition, MindMapViewController._zoomInFactor);
   }
 
   @override
