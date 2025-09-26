@@ -6,7 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../layout/mind_map_layout.dart';
 import '../state/layout_snapshot.dart';
 import '../state/mind_map_state.dart';
+import '../state/node_edit_request.dart';
 import '../utils/constants.dart';
+
+typedef FocusOnNodeCallback = void Function(String id, {bool preferTopHalf});
+
+typedef NodeEditingChangedCallback =
+    void Function(String id, bool isEditing, {bool preferTopHalf});
 
 class MindMapNodeCard extends ConsumerStatefulWidget {
   const MindMapNodeCard({
@@ -14,13 +20,15 @@ class MindMapNodeCard extends ConsumerStatefulWidget {
     required this.isSelected,
     required this.accentColor,
     this.onRequestFocusOnNode,
+    this.onEditingChanged,
     super.key,
   });
 
   final NodeRenderData data;
   final bool isSelected;
   final Color accentColor;
-  final ValueChanged<String>? onRequestFocusOnNode;
+  final FocusOnNodeCallback? onRequestFocusOnNode;
+  final NodeEditingChangedCallback? onEditingChanged;
 
   @override
   ConsumerState<MindMapNodeCard> createState() => _MindMapNodeCardState();
@@ -31,6 +39,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
   late final FocusNode _focusNode;
   bool _updating = false;
   bool _pendingFocusRequest = false;
+  late final ProviderSubscription<String?> _editRequestSubscription;
 
   @override
   void initState() {
@@ -39,6 +48,18 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _focusNode = FocusNode();
     _focusNode.onKeyEvent = _handleKeyEvent;
     _focusNode.addListener(_handleFocusChange);
+    _editRequestSubscription = ref.listenManual<String?>(
+      nodeEditRequestProvider,
+      (previous, next) {
+        if (next == widget.data.node.id) {
+          _handleEditPressed();
+          final notifier = ref.read(nodeEditRequestProvider.notifier);
+          if (notifier.state == widget.data.node.id) {
+            notifier.state = null;
+          }
+        }
+      },
+    );
     if (widget.isSelected) {
       _scheduleFocusRequest();
     }
@@ -49,6 +70,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     _focusNode.removeListener(_handleFocusChange);
     _focusNode.dispose();
     _controller.dispose();
+    _editRequestSubscription.close();
     super.dispose();
   }
 
@@ -215,12 +237,21 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
     }
+    widget.onRequestFocusOnNode?.call(
+      widget.data.node.id,
+      preferTopHalf: _isTouchOnlyDevice(),
+    );
   }
 
   void _handleFocusChange() {
     if (_focusNode.hasFocus) {
       ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
     }
+    widget.onEditingChanged?.call(
+      widget.data.node.id,
+      _focusNode.hasFocus,
+      preferTopHalf: _isTouchOnlyDevice(),
+    );
     if (mounted) {
       setState(() {});
     }
@@ -281,7 +312,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     final ignoreTextInput = isTouchOnly && !_focusNode.hasFocus;
     return GestureDetector(
       onTap: _handleTap,
-      onDoubleTap: isTouchOnly ? _handleEditPressed : null,
+      onLongPress: isTouchOnly ? _handleEditPressed : null,
       child: Stack(
         fit: StackFit.passthrough,
         clipBehavior: Clip.none,

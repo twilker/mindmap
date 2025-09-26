@@ -10,6 +10,7 @@ import '../layout/mind_map_layout.dart';
 import '../state/current_map.dart';
 import '../state/mind_map_state.dart';
 import '../state/mind_map_storage.dart';
+import '../state/node_edit_request.dart';
 import '../utils/constants.dart';
 import '../utils/svg_exporter.dart';
 import '../widgets/mind_map_view.dart';
@@ -287,6 +288,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     final notifier = ref.read(mindMapProvider.notifier);
     final theme = Theme.of(context);
     final canDelete = state.root.id != selectedId;
+    final editRequest = ref.read(nodeEditRequestProvider.notifier);
 
     return SafeArea(
       top: false,
@@ -333,6 +335,21 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
                 backgroundColor: canDelete ? theme.colorScheme.error : null,
                 foregroundColor: canDelete ? theme.colorScheme.onError : null,
               ),
+              const SizedBox(height: 12),
+              _floatingActionButton(
+                heroTag: 'node_edit',
+                icon: Icons.edit_outlined,
+                tooltip: 'Edit node',
+                onPressed: () {
+                  notifier.selectNode(selectedId);
+                  editRequest.state = null;
+                  editRequest.state = selectedId;
+                  _viewController.focusOnNode(
+                    selectedId,
+                    preferTopHalf: _isTouchOnlyPlatform(),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -356,5 +373,18 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
       tooltip: tooltip,
       child: Icon(icon),
     );
+  }
+
+  bool _isTouchOnlyPlatform() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.iOS:
+        return true;
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
+    }
   }
 }

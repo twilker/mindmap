@@ -29,7 +29,8 @@ class MindMapViewController {
 
   void resetView() => _state?._resetView();
 
-  void focusOnNode(String id) => _state?._focusOnNode(id);
+  void focusOnNode(String id, {bool preferTopHalf = false}) =>
+      _state?._focusOnNode(id, preferTopHalf: preferTopHalf);
 }
 
 class MindMapView extends ConsumerStatefulWidget {
@@ -50,6 +51,10 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   Matrix4? _homeTransform;
   Size? _viewportSize;
   String? _pendingFocusNodeId;
+  bool _pendingPreferTopHalf = false;
+  double _keyboardInset = 0;
+  String? _editingNodeId;
+  bool _editingPreferTopHalf = false;
 
   @override
   void initState() {
@@ -127,18 +132,55 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     _zoomBy(factor, viewportSize);
   }
 
-  void _focusOnNode(String id) {
+  void _focusOnNode(String id, {bool preferTopHalf = false}) {
     if (!mounted) {
       return;
     }
     setState(() {
       _pendingFocusNodeId = id;
+      _pendingPreferTopHalf = preferTopHalf;
+    });
+  }
+
+  void _handleEditingChanged(
+    String nodeId,
+    bool isEditing, {
+    bool preferTopHalf = false,
+  }) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (isEditing) {
+        _editingNodeId = nodeId;
+        _editingPreferTopHalf = preferTopHalf;
+      } else if (_editingNodeId == nodeId) {
+        _editingNodeId = null;
+        _editingPreferTopHalf = false;
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final mindMapState = ref.watch(mindMapProvider);
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final previousInset = _keyboardInset;
+    final bottomInset = viewInsets.bottom;
+    if (previousInset != bottomInset) {
+      if (bottomInset > 0 &&
+          previousInset <= 0 &&
+          _editingNodeId != null &&
+          _editingPreferTopHalf) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _editingNodeId == null) {
+            return;
+          }
+          _focusOnNode(_editingNodeId!, preferTopHalf: true);
+        });
+      }
+      _keyboardInset = bottomInset;
+    }
     final layoutEngine = MindMapLayoutEngine(
       textStyle: textStyle,
       textScaler: MediaQuery.textScalerOf(context),
@@ -171,8 +213,9 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   }
 
   void _scheduleLayoutSnapshotUpdate(MindMapLayoutResult layout) {
-    final snapshot =
-        layout.isEmpty ? null : MindMapLayoutSnapshot(nodes: layout.nodes);
+    final snapshot = layout.isEmpty
+        ? null
+        : MindMapLayoutSnapshot(nodes: layout.nodes);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -221,7 +264,19 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                                 ? data.branchIndex
                                 : 0) %
                             branchColors.length],
-                    onRequestFocusOnNode: widget.controller?.focusOnNode,
+                    onRequestFocusOnNode: widget.controller == null
+                        ? null
+                        : (id, {bool preferTopHalf = false}) => widget
+                              .controller!
+                              .focusOnNode(id, preferTopHalf: preferTopHalf),
+                    onEditingChanged:
+                        (nodeId, isEditing, {bool preferTopHalf = false}) {
+                          _handleEditingChanged(
+                            nodeId,
+                            isEditing,
+                            preferTopHalf: preferTopHalf,
+                          );
+                        },
                   ),
                 ),
               ),
@@ -279,8 +334,14 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       height: data.size.height,
     );
     final transformedRect = MatrixUtils.transformRect(matrix, rect);
-    final delta = _computeFocusDelta(transformedRect, viewportSize);
+    final preferTopHalf = _pendingPreferTopHalf;
     _pendingFocusNodeId = null;
+    _pendingPreferTopHalf = false;
+    final delta = _computeFocusDelta(
+      transformedRect,
+      viewportSize,
+      preferTopHalf,
+    );
     if (delta == Offset.zero) {
       return;
     }
@@ -293,7 +354,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     _animateTo(matrix);
   }
 
-  Offset _computeFocusDelta(Rect rect, Size viewportSize) {
+  Offset _computeFocusDelta(Rect rect, Size viewportSize, bool preferTopHalf) {
     var dx = 0.0;
     var dy = 0.0;
     Rect adjusted = rect;
@@ -314,18 +375,36 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       }
     }
 
-    if (viewportSize.height <= focusViewportMargin * 2) {
-      dy = viewportSize.height / 2 - adjusted.center.dy;
-      adjusted = adjusted.shift(Offset(0, dy));
+    final bottomInset = _keyboardInset;
+    final visibleBottom = max(
+      viewportSize.height - bottomInset,
+      focusViewportMargin,
+    );
+    final topLimit = focusViewportMargin;
+    final bottomLimit = visibleBottom - focusViewportMargin;
+
+    if (bottomLimit <= topLimit) {
+      final targetCenterY = (visibleBottom + topLimit) / 2;
+      final delta = targetCenterY - adjusted.center.dy;
+      dy += delta;
+      adjusted = adjusted.shift(Offset(0, delta));
     } else {
-      if (adjusted.top < focusViewportMargin) {
-        final delta = focusViewportMargin - adjusted.top;
+      if (adjusted.top < topLimit) {
+        final delta = topLimit - adjusted.top;
         dy += delta;
         adjusted = adjusted.shift(Offset(0, delta));
       }
-      if (adjusted.bottom > viewportSize.height - focusViewportMargin) {
-        final delta =
-            viewportSize.height - focusViewportMargin - adjusted.bottom;
+      if (adjusted.bottom > bottomLimit) {
+        final delta = bottomLimit - adjusted.bottom;
+        dy += delta;
+        adjusted = adjusted.shift(Offset(0, delta));
+      }
+    }
+
+    if (preferTopHalf && bottomInset > 0) {
+      final targetCenterY = visibleBottom / 2;
+      if (adjusted.center.dy > targetCenterY) {
+        final delta = targetCenterY - adjusted.center.dy;
         dy += delta;
         adjusted = adjusted.shift(Offset(0, delta));
       }
