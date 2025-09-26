@@ -297,13 +297,6 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     }
   }
 
-  bool get _showTouchEditButton {
-    if (!_isTouchOnlyDevice()) {
-      return false;
-    }
-    return widget.isSelected && !_focusNode.hasFocus;
-  }
-
   @override
   Widget build(BuildContext context) {
     final highlight = widget.isSelected ? widget.accentColor : Colors.black12;
@@ -312,6 +305,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     final ignoreTextInput = isTouchOnly && !_focusNode.hasFocus;
     return GestureDetector(
       onTap: _handleTap,
+      onDoubleTap: _handleEditPressed,
       onLongPress: isTouchOnly ? _handleEditPressed : null,
       child: Stack(
         fit: StackFit.passthrough,
@@ -360,16 +354,6 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
               ),
             ),
           ),
-          if (_showTouchEditButton)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton.filledTonal(
-                onPressed: _handleEditPressed,
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: 'Bearbeiten',
-              ),
-            ),
         ],
       ),
     );

@@ -55,6 +55,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   double _keyboardInset = 0;
   String? _editingNodeId;
   bool _editingPreferTopHalf = false;
+  Offset? _pendingDoubleTapPosition;
 
   @override
   void initState() {
@@ -132,6 +133,25 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     _zoomBy(factor, viewportSize);
   }
 
+  void _zoomAt(Offset focalPoint, double factor) {
+    final viewportSize = _viewportSize;
+    if (viewportSize == null) {
+      return;
+    }
+    final current = _controller.value.clone();
+    final scale = current.getMaxScaleOnAxis();
+    final targetScale = (scale * factor).clamp(zoomMinScale, zoomMaxScale);
+    final appliedFactor = targetScale / scale;
+    if (appliedFactor == 1) {
+      return;
+    }
+    final matrix = Matrix4.identity()
+      ..translate(focalPoint.dx, focalPoint.dy)
+      ..scale(appliedFactor, appliedFactor, 1)
+      ..translate(-focalPoint.dx, -focalPoint.dy);
+    _controller.value = matrix.multiplied(current);
+  }
+
   void _focusOnNode(String id, {bool preferTopHalf = false}) {
     if (!mounted) {
       return;
@@ -159,6 +179,18 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         _editingPreferTopHalf = false;
       }
     });
+  }
+
+  void _handleBackgroundTap() {
+    if (_editingNodeId != null) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+  }
+
+  void _handleBackgroundDoubleTap(Offset localPosition) {
+    _pendingDoubleTapPosition = null;
+    _handleBackgroundTap();
+    _zoomAt(localPosition, 1.25);
   }
 
   @override
@@ -234,53 +266,87 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     );
     final nodes = layout.nodes.values.toList();
 
-    return InteractiveViewer(
-      transformationController: _controller,
-      minScale: zoomMinScale,
-      maxScale: zoomMaxScale,
-      boundaryMargin: const EdgeInsets.all(double.infinity),
-      constrained: false,
-      child: SizedBox(
-        width: max(contentSize.width, 1),
-        height: max(contentSize.height, 1),
-        child: Stack(
-          children: [
-            CustomPaint(
-              size: contentSize,
-              painter: _ConnectorPainter(layout: layout, origin: origin),
-            ),
-            for (final data in nodes)
-              Positioned(
-                left: data.topLeft.dx + origin.dx,
-                top: data.topLeft.dy + origin.dy,
-                child: SizedBox(
-                  width: data.size.width,
-                  height: data.size.height,
-                  child: MindMapNodeCard(
-                    data: data,
-                    isSelected: data.node.id == selectedId,
-                    accentColor:
-                        branchColors[(data.branchIndex >= 0
-                                ? data.branchIndex
-                                : 0) %
-                            branchColors.length],
-                    onRequestFocusOnNode: widget.controller == null
-                        ? null
-                        : (id, {bool preferTopHalf = false}) => widget
-                              .controller!
-                              .focusOnNode(id, preferTopHalf: preferTopHalf),
-                    onEditingChanged:
-                        (nodeId, isEditing, {bool preferTopHalf = false}) {
-                          _handleEditingChanged(
-                            nodeId,
-                            isEditing,
-                            preferTopHalf: preferTopHalf,
-                          );
-                        },
+    bool isPointOnNode(Offset localPosition) {
+      final inverse = Matrix4.inverted(_controller.value);
+      final scenePoint = MatrixUtils.transformPoint(inverse, localPosition);
+      for (final data in nodes) {
+        final rect = Rect.fromLTWH(
+          data.topLeft.dx + origin.dx,
+          data.topLeft.dy + origin.dy,
+          data.size.width,
+          data.size.height,
+        );
+        if (rect.contains(scenePoint)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: _handleBackgroundTap,
+      onDoubleTapDown: (details) {
+        if (isPointOnNode(details.localPosition)) {
+          _pendingDoubleTapPosition = null;
+          return;
+        }
+        _pendingDoubleTapPosition = details.localPosition;
+      },
+      onDoubleTap: () {
+        final position = _pendingDoubleTapPosition;
+        if (position != null) {
+          _handleBackgroundDoubleTap(position);
+        }
+      },
+      child: InteractiveViewer(
+        transformationController: _controller,
+        minScale: zoomMinScale,
+        maxScale: zoomMaxScale,
+        boundaryMargin: const EdgeInsets.all(double.infinity),
+        constrained: false,
+        child: SizedBox(
+          width: max(contentSize.width, 1),
+          height: max(contentSize.height, 1),
+          child: Stack(
+            children: [
+              CustomPaint(
+                size: contentSize,
+                painter: _ConnectorPainter(layout: layout, origin: origin),
+              ),
+              for (final data in nodes)
+                Positioned(
+                  left: data.topLeft.dx + origin.dx,
+                  top: data.topLeft.dy + origin.dy,
+                  child: SizedBox(
+                    width: data.size.width,
+                    height: data.size.height,
+                    child: MindMapNodeCard(
+                      data: data,
+                      isSelected: data.node.id == selectedId,
+                      accentColor:
+                          branchColors[(data.branchIndex >= 0
+                                  ? data.branchIndex
+                                  : 0) %
+                              branchColors.length],
+                      onRequestFocusOnNode: widget.controller == null
+                          ? null
+                          : (id, {bool preferTopHalf = false}) => widget
+                                .controller!
+                                .focusOnNode(id, preferTopHalf: preferTopHalf),
+                      onEditingChanged:
+                          (nodeId, isEditing, {bool preferTopHalf = false}) {
+                            _handleEditingChanged(
+                              nodeId,
+                              isEditing,
+                              preferTopHalf: preferTopHalf,
+                            );
+                          },
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
