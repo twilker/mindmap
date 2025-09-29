@@ -383,6 +383,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(appCornerRadius),
       ),
+      elevation: 0,
       child: Icon(icon),
     );
   }

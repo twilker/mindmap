@@ -20,7 +20,7 @@ class BrandLoadingScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(36),
+                  padding: const EdgeInsets.all(0),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.18),
                     borderRadius: BorderRadius.circular(appCornerRadius),
