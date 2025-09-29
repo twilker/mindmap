@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
+const double appCornerRadius = 12;
+
 const double nodeMaxWidth = 240;
 const double nodeMinWidth = 80;
 const double nodeMinHeight = 44;

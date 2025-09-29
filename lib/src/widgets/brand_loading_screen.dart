@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_colors.dart';
+import '../utils/constants.dart';
 
 class BrandLoadingScreen extends StatelessWidget {
   const BrandLoadingScreen({super.key});
@@ -19,26 +20,15 @@ class BrandLoadingScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(36),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(32),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.25),
-                      width: 1.5,
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 32,
-                        offset: Offset(0, 12),
-                      ),
-                    ],
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(appCornerRadius),
                   ),
                   child: SvgPicture.asset(
                     'assets/logo/mindkite_mark_notail_light.svg',
-                    width: 96,
-                    height: 96,
+                    width: 128,
+                    height: 128,
                   ),
                 ),
                 const SizedBox(height: 32),

@@ -303,8 +303,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     final theme = Theme.of(context);
     final borderColor = widget.isSelected
         ? widget.accentColor
-        : theme.colorScheme.primary.withOpacity(0.14);
-    final shadowColor = AppColors.graphSlate.withOpacity(0.08);
+        : AppColors.graphSlate.withOpacity(0.16);
     final backgroundColor = theme.colorScheme.surface;
     final isTouchOnly = _isTouchOnlyDevice();
     final ignoreTextInput = isTouchOnly && !_focusNode.hasFocus;
@@ -319,20 +318,13 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
           DecoratedBox(
             decoration: BoxDecoration(
               color: backgroundColor,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(appCornerRadius),
               border: Border.all(
                 color: borderColor,
                 width: widget.isSelected
                     ? nodeSelectedBorderWidth
                     : nodeBorderWidth,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: shadowColor,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(
@@ -350,7 +342,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
                   minLines: null,
                   keyboardType: TextInputType.multiline,
                   textAlign: TextAlign.center,
-                  style: textStyle.copyWith(color: theme.colorScheme.onSurface),
+                  style: textStyle,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     isCollapsed: true,

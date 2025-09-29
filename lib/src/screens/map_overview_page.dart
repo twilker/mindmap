@@ -10,9 +10,10 @@ import 'package:uuid/uuid.dart';
 import '../state/current_map.dart';
 import '../state/mind_map_state.dart';
 import '../state/mind_map_storage.dart';
+import '../theme/app_colors.dart';
+import '../utils/constants.dart';
 import '../utils/markdown_converter.dart';
 import '../utils/mindmeister_importer.dart';
-import '../theme/app_colors.dart';
 import 'mind_map_editor_page.dart';
 
 class MindMapOverviewPage extends ConsumerStatefulWidget {
@@ -98,26 +99,15 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6D69FF), Color(0x802AA8FF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.graphSlate.withOpacity(0.12),
-                blurRadius: 24,
-                offset: const Offset(0, 16),
-              ),
-            ],
+            color: AppColors.primarySky,
+            borderRadius: BorderRadius.circular(appCornerRadius),
           ),
           child: SvgPicture.asset(
             'assets/logo/mindkite_mark_notail_light.svg',
-            height: 48,
-            width: 48,
+            height: 64,
+            width: 64,
           ),
         ),
         const SizedBox(width: 20),
@@ -153,15 +143,8 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: AppColors.graphSlate.withOpacity(0.08)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.graphSlate.withOpacity(0.08),
-              blurRadius: 32,
-              offset: const Offset(0, 18),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(appCornerRadius),
+          border: Border.all(color: AppColors.graphSlate.withOpacity(0.12)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -480,24 +463,13 @@ class _MindMapCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onOpen,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(appCornerRadius),
         splashColor: colorScheme.primary.withOpacity(0.08),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: const LinearGradient(
-              colors: [Color(0xFFE7F4FF), Colors.white],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(appCornerRadius),
             border: Border.all(color: colorScheme.primary.withOpacity(0.12)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.graphSlate.withOpacity(0.08),
-                blurRadius: 28,
-                offset: const Offset(0, 18),
-              ),
-            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),

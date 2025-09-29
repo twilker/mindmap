@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../utils/constants.dart';
 import 'app_colors.dart';
 
 class AppTheme {
@@ -56,7 +57,7 @@ class AppTheme {
     );
 
     final cardShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(appCornerRadius),
     );
 
     return base.copyWith(
@@ -75,8 +76,8 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        elevation: 6,
-        shadowColor: AppColors.graphSlate.withOpacity(0.08),
+        elevation: 0,
+        shadowColor: Colors.transparent,
         shape: cardShape,
         surfaceTintColor: Colors.white,
       ),
@@ -84,7 +85,9 @@ class AppTheme {
         backgroundColor: colorScheme.onBackground,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(appCornerRadius),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -93,7 +96,7 @@ class AppTheme {
           textStyle: textTheme.labelLarge,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(appCornerRadius),
           ),
         ),
       ),
@@ -104,7 +107,7 @@ class AppTheme {
           textStyle: textTheme.labelLarge,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(appCornerRadius),
           ),
         ),
       ),
@@ -115,7 +118,7 @@ class AppTheme {
           side: BorderSide(color: colorScheme.primary.withOpacity(0.4)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(appCornerRadius),
           ),
         ),
       ),
@@ -123,7 +126,7 @@ class AppTheme {
         style: IconButton.styleFrom(
           foregroundColor: colorScheme.onBackground,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(appCornerRadius),
           ),
           padding: const EdgeInsets.all(10),
         ),
@@ -131,7 +134,9 @@ class AppTheme {
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.primarySky,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(appCornerRadius),
+        ),
       ),
       dialogTheme: DialogThemeData(
         shape: cardShape,
@@ -144,11 +149,11 @@ class AppTheme {
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(appCornerRadius),
           borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(appCornerRadius),
           borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
@@ -164,7 +169,9 @@ class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: colorScheme.primary.withOpacity(0.1),
         labelStyle: textTheme.bodyMedium,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(appCornerRadius),
+        ),
       ),
       visualDensity: VisualDensity.adaptivePlatformDensity,
     );

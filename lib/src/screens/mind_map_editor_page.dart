@@ -190,47 +190,35 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
 
   Widget _buildHeader(String mapName, {required bool showName}) {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.graphSlate.withOpacity(0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Material(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                tooltip: 'Back to overview',
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-              if (showName) ...[
-                const SizedBox(width: 12),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: Text(
-                    mapName,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+    return Material(
+      color: theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(appCornerRadius),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Back to overview',
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            if (showName) ...[
+              const SizedBox(width: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Text(
+                  mapName,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -238,39 +226,27 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
 
   Widget _buildToolbar() {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.graphSlate.withOpacity(0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Material(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            alignment: WrapAlignment.end,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.file_download),
-                tooltip: 'Export text',
-                onPressed: _exportMarkdown,
-              ),
-              IconButton(
-                icon: const Icon(Icons.image_outlined),
-                tooltip: 'Export SVG',
-                onPressed: _exportSvg,
-              ),
-            ],
-          ),
+    return Material(
+      color: theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(appCornerRadius),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          alignment: WrapAlignment.end,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.file_download),
+              tooltip: 'Export text',
+              onPressed: _exportMarkdown,
+            ),
+            IconButton(
+              icon: const Icon(Icons.image_outlined),
+              tooltip: 'Export SVG',
+              onPressed: _exportSvg,
+            ),
+          ],
         ),
       ),
     );
@@ -404,7 +380,9 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
       backgroundColor: backgroundColor,
       foregroundColor: foregroundColor,
       tooltip: tooltip,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(appCornerRadius),
+      ),
       child: Icon(icon),
     );
   }
