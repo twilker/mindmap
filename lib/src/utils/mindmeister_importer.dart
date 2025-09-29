@@ -22,7 +22,8 @@ class MindmeisterImporter {
       if (json.containsKey('root') && json['root'] is Map<String, dynamic>) {
         return json['root'] as Map<String, dynamic>;
       }
-      if (json.containsKey('mindmap') && json['mindmap'] is Map<String, dynamic>) {
+      if (json.containsKey('mindmap') &&
+          json['mindmap'] is Map<String, dynamic>) {
         final map = json['mindmap'] as Map<String, dynamic>;
         if (map.containsKey('root') && map['root'] is Map<String, dynamic>) {
           return map['root'] as Map<String, dynamic>;

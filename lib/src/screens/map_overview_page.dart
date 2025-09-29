@@ -1,13 +1,17 @@
 import 'dart:convert';
+import 'dart:ui' show ImageFilter;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 
 import '../state/current_map.dart';
 import '../state/mind_map_state.dart';
 import '../state/mind_map_storage.dart';
+import '../theme/app_colors.dart';
+import '../utils/constants.dart';
 import '../utils/markdown_converter.dart';
 import '../utils/mindmeister_importer.dart';
 import 'mind_map_editor_page.dart';
@@ -25,90 +29,185 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final savedMaps = ref.watch(savedMapsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Your mind maps'), centerTitle: false),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+      body: Stack(
+        children: [
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.cloudWhite, Colors.white],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add_circle),
-                    label: const Text('New mind map'),
-                    onPressed: _busy ? null : _createNewMap,
+                  _buildHeroSection(theme),
+                  const SizedBox(height: 24),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.flight_takeoff_rounded),
+                        label: const Text('New mind map'),
+                        onPressed: _busy ? null : _createNewMap,
+                      ),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.file_open),
+                        label: const Text('Import text'),
+                        onPressed: _busy ? null : _importMarkdown,
+                      ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.cloud_upload_outlined),
+                        label: const Text('Import .mind'),
+                        onPressed: _busy ? null : _importMindFile,
+                      ),
+                    ],
                   ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.file_open),
-                    label: const Text('Import text'),
-                    onPressed: _busy ? null : _importMarkdown,
-                  ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.cloud_upload),
-                    label: const Text('Import .mind'),
-                    onPressed: _busy ? null : _importMindFile,
+                  const SizedBox(height: 24),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 320),
+                      child: savedMaps.isEmpty
+                          ? _buildEmptyState(theme)
+                          : _buildSavedMapsGrid(savedMaps),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: savedMaps.isEmpty
-                    ? _buildEmptyState()
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          final columnWidth = 260.0;
-                          final count = (constraints.maxWidth / columnWidth)
-                              .floor()
-                              .clamp(1, 4);
-                          return GridView.builder(
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: count,
-                                  crossAxisSpacing: 16,
-                                  mainAxisSpacing: 16,
-                                  childAspectRatio: 1.25,
-                                ),
-                            itemCount: savedMaps.length,
-                            itemBuilder: (context, index) {
-                              final name = savedMaps[index];
-                              return _MindMapCard(
-                                name: name,
-                                onOpen: () => _openMap(name),
-                                onDelete: () => _confirmDelete(name),
-                              );
-                            },
-                          );
-                        },
-                      ),
+            ),
+          ),
+          if (_busy) const _BusyOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroSection(ThemeData theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(0),
+          decoration: BoxDecoration(
+            gradient: AppColors.heroGradient,
+            color: Colors.white.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(appCornerRadius),
+          ),
+          child: SvgPicture.asset(
+            'assets/logo/mindkite_mark_notail_light.svg',
+            height: 128,
+            width: 128,
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'MindKite',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Let ideas fly freely.',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onBackground.withOpacity(0.7),
+                ),
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(appCornerRadius),
+          border: Border.all(color: AppColors.graphSlate.withOpacity(0.12)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withOpacity(0.12),
+              ),
+              child: Icon(
+                Icons.airplanemode_active,
+                size: 40,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No mind maps yet',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Create a new map or import one to get started.',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onBackground.withOpacity(0.65),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.account_tree_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'No mind maps yet',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+  Widget _buildSavedMapsGrid(List<String> savedMaps) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const columnWidth = 260.0;
+        final count = (constraints.maxWidth / columnWidth).floor().clamp(1, 4);
+        return GridView.builder(
+          padding: const EdgeInsets.only(bottom: 8),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: count,
+            crossAxisSpacing: 20,
+            mainAxisSpacing: 20,
+            childAspectRatio: 1.2,
           ),
-          SizedBox(height: 8),
-          Text('Create a new map or import one to get started.'),
-        ],
-      ),
+          itemCount: savedMaps.length,
+          itemBuilder: (context, index) {
+            final name = savedMaps[index];
+            return _MindMapCard(
+              name: name,
+              onOpen: () => _openMap(name),
+              onDelete: () => _confirmDelete(name),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -359,59 +458,97 @@ class _MindMapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      clipBehavior: Clip.antiAlias,
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onOpen,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(appCornerRadius),
+        splashColor: colorScheme.primary.withOpacity(0.08),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(appCornerRadius),
+            border: Border.all(color: colorScheme.primary.withOpacity(0.12)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: Icon(
+                        Icons.airplanemode_on,
+                        color: colorScheme.primary,
+                      ),
                     ),
-                    padding: const EdgeInsets.all(12),
-                    child: Icon(
-                      Icons.account_tree,
-                      color: Theme.of(context).colorScheme.primary,
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      tooltip: 'Delete mind map',
+                      onPressed: onDelete,
                     ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: 'Delete mind map',
-                    onPressed: onDelete,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Tap to open',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onBackground.withOpacity(0.6),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BusyOverlay extends StatelessWidget {
+  const _BusyOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Positioned.fill(
+      child: AbsorbPointer(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            color: colorScheme.background.withOpacity(0.65),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 64, child: LinearProgressIndicator()),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Importing…',
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
               ),
-              const Spacer(),
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tap to open',
-                style: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

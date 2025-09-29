@@ -34,7 +34,10 @@ void main() {
     );
 
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 1200));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Your mind maps'), findsOneWidget);
+    expect(find.text('MindKite'), findsOneWidget);
+    expect(find.text('Let ideas fly freely.'), findsOneWidget);
   });
 }

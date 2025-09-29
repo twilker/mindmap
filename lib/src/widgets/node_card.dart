@@ -7,6 +7,7 @@ import '../layout/mind_map_layout.dart';
 import '../state/layout_snapshot.dart';
 import '../state/mind_map_state.dart';
 import '../state/node_edit_request.dart';
+import '../theme/app_colors.dart';
 import '../utils/constants.dart';
 
 typedef FocusOnNodeCallback = void Function(String id, {bool preferTopHalf});
@@ -299,8 +300,11 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
 
   @override
   Widget build(BuildContext context) {
-    final highlight = widget.isSelected ? widget.accentColor : Colors.black12;
-    final shadowColor = Colors.black.withValues(alpha: Colors.black.a * 0.06);
+    final theme = Theme.of(context);
+    final borderColor = widget.isSelected
+        ? widget.accentColor
+        : AppColors.graphSlate.withOpacity(0.16);
+    final backgroundColor = theme.colorScheme.surface;
     final isTouchOnly = _isTouchOnlyDevice();
     final ignoreTextInput = isTouchOnly && !_focusNode.hasFocus;
     return GestureDetector(
@@ -313,21 +317,14 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
         children: [
           DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(appCornerRadius),
               border: Border.all(
-                color: highlight,
+                color: borderColor,
                 width: widget.isSelected
                     ? nodeSelectedBorderWidth
                     : nodeBorderWidth,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: shadowColor,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(
@@ -348,6 +345,8 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
                   style: textStyle,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.all(0),
                     isCollapsed: true,
                   ),
                 ),
