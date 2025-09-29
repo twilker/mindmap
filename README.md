@@ -1,6 +1,6 @@
-# mindmap_app
+# MindKite
 
-A new Flutter project.
+Let ideas fly freely.
 
 ## Getting Started
 
