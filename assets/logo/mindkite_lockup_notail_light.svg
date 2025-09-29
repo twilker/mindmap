@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400">
+
+<g transform="translate(0,0)"><polygon points="200.0,38.0 350.0,188.0 200.0,338.0 50.0,188.0" fill="none" stroke="#334155" stroke-width="14" stroke-linejoin="round"/>
+<line x1="50.0" y1="188.0" x2="350.0" y2="188.0" stroke="#334155" stroke-width="10" stroke-linecap="round"/>
+<line x1="200.0" y1="338.0" x2="200.0" y2="38.0" stroke="#334155" stroke-width="10" stroke-linecap="round"/>
+<path d="M 180.0,58.0 L 200.0,38.0 L 220.0,58.0" fill="none" stroke="#334155" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="200.0" cy="38.0" r="14" fill="#2AA8FF" stroke="#334155" stroke-width="4"/>
+<circle cx="350.0" cy="188.0" r="14" fill="#9AA6FF" stroke="#334155" stroke-width="4"/>
+<circle cx="200.0" cy="338.0" r="14" fill="#2AA8FF" stroke="#334155" stroke-width="4"/>
+<circle cx="50.0" cy="188.0" r="14" fill="#9AA6FF" stroke="#334155" stroke-width="4"/></g>
+
+    <g transform="translate(440, 120)">
+      <text x="0" y="0" font-family="Space Grotesk, Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans" font-size="110" font-weight="700" fill="#334155" letter-spacing="0.5">
+        MindKite
+      </text>
+      <text x="2" y="70" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans" font-size="28" fill="#334155" opacity="0.75" letter-spacing="0.2">
+        Let ideas fly freely.
+      </text>
+    </g>
+    </svg>
