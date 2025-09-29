@@ -16,13 +16,19 @@
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchBackground" translatesAutoresizingMaskIntoConstraints="NO" id="qkV-at-3ck">
+                            </imageView>
                             <imageView opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" image="LaunchImage" translatesAutoresizingMaskIntoConstraints="NO" id="YRO-k0-Ey4">
                             </imageView>
                         </subviews>
-                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" red="0.4274509804" green="0.4117647059" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
+                            <constraint firstItem="qkV-at-3ck" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="0iZ-Np-1VJ"/>
+                            <constraint firstAttribute="trailing" secondItem="qkV-at-3ck" secondAttribute="trailing" id="2aY-L7-2UY"/>
                             <constraint firstItem="YRO-k0-Ey4" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="1a2-6s-vTC"/>
                             <constraint firstItem="YRO-k0-Ey4" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="4X2-HB-R7a"/>
+                            <constraint firstItem="qkV-at-3ck" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="6b1-pu-Kpq"/>
+                            <constraint firstAttribute="bottom" secondItem="qkV-at-3ck" secondAttribute="bottom" id="rDq-L0-Oix"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -32,6 +38,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchImage" width="168" height="185"/>
+        <image name="LaunchBackground" width="1024" height="1024"/>
+        <image name="LaunchImage" width="256" height="256"/>
     </resources>
 </document>
