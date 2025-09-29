@@ -34,5 +34,6 @@ class MindMapNode {
   }
 
   @override
-  int get hashCode => Object.hash(id, text, const DeepCollectionEquality().hash(children));
+  int get hashCode =>
+      Object.hash(id, text, const DeepCollectionEquality().hash(children));
 }

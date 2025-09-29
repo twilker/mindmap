@@ -4,6 +4,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'src/screens/map_overview_page.dart';
 import 'src/state/mind_map_storage.dart';
+import 'src/theme/app_theme.dart';
+import 'src/widgets/brand_loading_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,19 +21,40 @@ Future<void> main() async {
   );
 }
 
-class MindMapApp extends StatelessWidget {
+class MindMapApp extends StatefulWidget {
   const MindMapApp({super.key});
+
+  @override
+  State<MindMapApp> createState() => _MindMapAppState();
+}
+
+class _MindMapAppState extends State<MindMapApp> {
+  bool _showSplash = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 1400), () {
+      if (mounted) {
+        setState(() => _showSplash = false);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Mind Map Editor',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        scaffoldBackgroundColor: const Color(0xFFF3F4F6),
-        useMaterial3: true,
+      title: 'MindKite',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      home: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 600),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _showSplash
+            ? const BrandLoadingScreen()
+            : const MindMapOverviewPage(),
       ),
-      home: const MindMapOverviewPage(),
     );
   }
 }

@@ -7,6 +7,7 @@ import '../layout/mind_map_layout.dart';
 import '../state/layout_snapshot.dart';
 import '../state/mind_map_state.dart';
 import '../state/node_edit_request.dart';
+import '../theme/app_colors.dart';
 import '../utils/constants.dart';
 
 typedef FocusOnNodeCallback = void Function(String id, {bool preferTopHalf});
@@ -299,8 +300,12 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
 
   @override
   Widget build(BuildContext context) {
-    final highlight = widget.isSelected ? widget.accentColor : Colors.black12;
-    final shadowColor = Colors.black.withValues(alpha: Colors.black.a * 0.06);
+    final theme = Theme.of(context);
+    final borderColor = widget.isSelected
+        ? widget.accentColor
+        : theme.colorScheme.primary.withOpacity(0.14);
+    final shadowColor = AppColors.graphSlate.withOpacity(0.08);
+    final backgroundColor = theme.colorScheme.surface;
     final isTouchOnly = _isTouchOnlyDevice();
     final ignoreTextInput = isTouchOnly && !_focusNode.hasFocus;
     return GestureDetector(
@@ -313,10 +318,10 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
         children: [
           DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: backgroundColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: highlight,
+                color: borderColor,
                 width: widget.isSelected
                     ? nodeSelectedBorderWidth
                     : nodeBorderWidth,
@@ -345,7 +350,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
                   minLines: null,
                   keyboardType: TextInputType.multiline,
                   textAlign: TextAlign.center,
-                  style: textStyle,
+                  style: textStyle.copyWith(color: theme.colorScheme.onSurface),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     isCollapsed: true,

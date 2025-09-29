@@ -14,6 +14,7 @@ import '../state/node_edit_request.dart';
 import '../utils/constants.dart';
 import '../utils/svg_exporter.dart';
 import '../widgets/mind_map_view.dart';
+import '../theme/app_colors.dart';
 
 class MindMapEditorPage extends ConsumerStatefulWidget {
   const MindMapEditorPage({super.key, required this.mapName});
@@ -150,13 +151,22 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     final mapName = ref.watch(currentMapNameProvider) ?? widget.mapName;
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          Positioned.fill(child: MindMapView(controller: _viewController)),
-          _buildTopControls(mapName),
-          _buildViewControls(),
-          _buildNodeActionBar(state),
-        ],
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.cloudWhite, Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(child: MindMapView(controller: _viewController)),
+            _buildTopControls(mapName),
+            _buildViewControls(),
+            _buildNodeActionBar(state),
+          ],
+        ),
       ),
     );
   }
@@ -179,65 +189,88 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
   }
 
   Widget _buildHeader(String mapName, {required bool showName}) {
-    return Material(
-      color: Colors.white,
-      elevation: 6,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              tooltip: 'Back to overview',
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            if (showName) ...[
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 320),
-                child: Text(
-                  mapName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.graphSlate.withOpacity(0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Material(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Back to overview',
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
               ),
+              if (showName) ...[
+                const SizedBox(width: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: Text(
+                    mapName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildToolbar() {
-    return Material(
-      color: Colors.white,
-      elevation: 6,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          alignment: WrapAlignment.end,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.file_download),
-              tooltip: 'Export text',
-              onPressed: _exportMarkdown,
-            ),
-            IconButton(
-              icon: const Icon(Icons.image),
-              tooltip: 'Export SVG',
-              onPressed: _exportSvg,
-            ),
-          ],
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.graphSlate.withOpacity(0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Material(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            alignment: WrapAlignment.end,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.file_download),
+                tooltip: 'Export text',
+                onPressed: _exportMarkdown,
+              ),
+              IconButton(
+                icon: const Icon(Icons.image_outlined),
+                tooltip: 'Export SVG',
+                onPressed: _exportSvg,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -371,6 +404,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
       backgroundColor: backgroundColor,
       foregroundColor: foregroundColor,
       tooltip: tooltip,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Icon(icon),
     );
   }
