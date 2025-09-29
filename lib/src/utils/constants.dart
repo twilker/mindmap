@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
-const double appCornerRadius = 12;
+const double appCornerRadius = 8;
 
 const double nodeMaxWidth = 240;
 const double nodeMinWidth = 80;
 const double nodeMinHeight = 44;
 const double nodeHorizontalPadding = 16;
-const double nodeTextFieldPadding = 8;
+const double nodeTextFieldPadding = 12;
 const double nodeVerticalPadding = 12;
 const double nodeBorderWidth = 1;
 const double nodeSelectedBorderWidth = 2;

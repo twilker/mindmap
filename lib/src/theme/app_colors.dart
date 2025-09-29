@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class AppColors {
   const AppColors._();
 
-  static const Color primarySky = Color(0xFF2AA8FF);
+  static const Color primarySky = Color.fromARGB(255, 85, 170, 231);
   static const Color nightNavy = Color(0xFF0B1220);
   static const Color cloudWhite = Color(0xFFF7FAFF);
   static const Color lavenderLift = Color(0xFF9AA6FF);

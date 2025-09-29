@@ -345,6 +345,8 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
                   style: textStyle,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.all(0),
                     isCollapsed: true,
                   ),
                 ),
