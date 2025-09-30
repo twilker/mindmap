@@ -423,6 +423,9 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
   }
 
   bool _isTouchOnlyPlatform() {
+    if (kIsWeb) {
+      return false;
+    }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
       case TargetPlatform.fuchsia:

@@ -570,13 +570,21 @@ class _MindMapPreviewContent extends StatelessWidget {
         if (data == null || data.isEmpty) {
           return _PreviewPlaceholder(color: baseColor);
         }
-        return FittedBox(
-          fit: BoxFit.contain,
-          child: Image.memory(
-            data,
-            filterQuality: FilterQuality.high,
-            gaplessPlayback: true,
-          ),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final size = constraints.biggest;
+            return Center(
+              child: Image.memory(
+                data,
+                width: size.width.isFinite ? size.width : null,
+                height: size.height.isFinite ? size.height : null,
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.high,
+                gaplessPlayback: true,
+              ),
+            );
+          },
         );
       },
       loading: () => const Center(
