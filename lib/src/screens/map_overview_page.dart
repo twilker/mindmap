@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:file_picker/file_picker.dart';
@@ -7,13 +8,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 
+import '../layout/mind_map_layout.dart';
 import '../state/current_map.dart';
 import '../state/mind_map_state.dart';
 import '../state/mind_map_storage.dart';
+import '../state/mind_map_preview_storage.dart';
 import '../theme/app_colors.dart';
 import '../utils/constants.dart';
 import '../utils/markdown_converter.dart';
 import '../utils/mindmeister_importer.dart';
+import '../utils/bird_view_renderer.dart';
 import 'mind_map_editor_page.dart';
 
 class MindMapOverviewPage extends ConsumerStatefulWidget {
@@ -224,9 +228,16 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
     }
 
     final tempNotifier = MindMapNotifier();
+    final layout = MindMapLayoutEngine(
+      textStyle: textStyle,
+      textScaler: MediaQuery.textScalerOf(context),
+    ).layout(tempNotifier.state.root);
+    final preview = await BirdViewRenderer.renderPreview(layout: layout);
     final markdown = tempNotifier.exportMarkdown();
     tempNotifier.dispose();
-    await ref.read(savedMapsProvider.notifier).save(name, markdown);
+    await ref
+        .read(savedMapsProvider.notifier)
+        .save(name, markdown, preview: preview);
     await _openMap(name, preloadedMarkdown: markdown);
     _showMessage('Created "$name"');
   }
@@ -317,7 +328,14 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
       return;
     }
     final normalized = converter.toMarkdown(root);
-    await ref.read(savedMapsProvider.notifier).save(name, normalized);
+    final layout = MindMapLayoutEngine(
+      textStyle: textStyle,
+      textScaler: MediaQuery.textScalerOf(context),
+    ).layout(root);
+    final preview = await BirdViewRenderer.renderPreview(layout: layout);
+    await ref
+        .read(savedMapsProvider.notifier)
+        .save(name, normalized, preview: preview);
     await _openMap(name, preloadedMarkdown: normalized);
     _showMessage('Imported "$name"');
   }
@@ -445,7 +463,7 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
   }
 }
 
-class _MindMapCard extends StatelessWidget {
+class _MindMapCard extends ConsumerWidget {
   const _MindMapCard({
     required this.name,
     required this.onOpen,
@@ -457,9 +475,10 @@ class _MindMapCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final previewAsync = ref.watch(mindMapPreviewProvider(name));
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -477,6 +496,19 @@ class _MindMapCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(appCornerRadius - 2),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.06),
+                      ),
+                      child: _MindMapPreviewContent(preview: previewAsync),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Container(
@@ -498,7 +530,7 @@ class _MindMapCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const Spacer(),
+                const SizedBox(height: 16),
                 Text(
                   name,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -507,7 +539,7 @@ class _MindMapCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
+                const Spacer(),
                 Text(
                   'Tap to open',
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -520,6 +552,52 @@ class _MindMapCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MindMapPreviewContent extends StatelessWidget {
+  const _MindMapPreviewContent({required this.preview});
+
+  final AsyncValue<Uint8List?> preview;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final Color baseColor = theme.colorScheme.onSurface.withOpacity(0.6);
+    return preview.when(
+      data: (data) {
+        if (data == null || data.isEmpty) {
+          return _PreviewPlaceholder(color: baseColor);
+        }
+        return Image.memory(
+          data,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          gaplessPlayback: true,
+        );
+      },
+      loading: () => const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      error: (_, __) => _PreviewPlaceholder(color: baseColor),
+    );
+  }
+}
+
+class _PreviewPlaceholder extends StatelessWidget {
+  const _PreviewPlaceholder({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Icon(Icons.travel_explore_outlined, color: color, size: 32),
     );
   }
 }
