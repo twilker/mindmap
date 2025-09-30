@@ -570,11 +570,13 @@ class _MindMapPreviewContent extends StatelessWidget {
         if (data == null || data.isEmpty) {
           return _PreviewPlaceholder(color: baseColor);
         }
-        return Image.memory(
-          data,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.medium,
-          gaplessPlayback: true,
+        return FittedBox(
+          fit: BoxFit.contain,
+          child: Image.memory(
+            data,
+            filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
+          ),
         );
       },
       loading: () => const Center(

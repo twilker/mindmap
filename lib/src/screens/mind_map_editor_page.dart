@@ -411,11 +411,11 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     }
     return SafeArea(
       left: false,
-      bottom: false,
+      top: false,
       child: Align(
-        alignment: Alignment.topRight,
+        alignment: Alignment.bottomRight,
         child: Padding(
-          padding: const EdgeInsets.only(top: 16, right: 16),
+          padding: const EdgeInsets.only(bottom: 20, right: 16),
           child: const MindMapBirdView(),
         ),
       ),

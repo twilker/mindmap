@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../layout/mind_map_layout.dart';
 import '../state/layout_snapshot.dart';
 import '../state/mind_map_state.dart';
 import '../utils/bird_view_renderer.dart';
@@ -14,10 +15,24 @@ class MindMapBirdView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final snapshot = ref.watch(mindMapLayoutSnapshotProvider);
-    final selectedId = ref.watch(
-      mindMapProvider.select((value) => value.selectedNodeId),
-    );
+    final mapState = ref.watch(mindMapProvider);
+    final selectedId = mapState.selectedNodeId;
     final theme = Theme.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+
+    MindMapLayoutSnapshot? effectiveSnapshot = snapshot;
+    if (effectiveSnapshot == null) {
+      final layout = MindMapLayoutEngine(
+        textStyle: textStyle,
+        textScaler: textScaler,
+      ).layout(mapState.root);
+      if (!layout.isEmpty) {
+        effectiveSnapshot = MindMapLayoutSnapshot(
+          nodes: layout.nodes,
+          bounds: layout.bounds,
+        );
+      }
+    }
 
     return Material(
       elevation: 8,
@@ -60,7 +75,7 @@ class MindMapBirdView extends ConsumerWidget {
                     ),
                   ),
                   child: _BirdViewCanvas(
-                    snapshot: snapshot,
+                    snapshot: effectiveSnapshot,
                     selectedNodeId: selectedId,
                   ),
                 ),
