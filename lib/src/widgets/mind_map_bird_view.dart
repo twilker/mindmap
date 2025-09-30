@@ -100,10 +100,12 @@ class _BirdViewCanvas extends StatelessWidget {
     if (effectiveSnapshot == null || effectiveSnapshot.nodes.isEmpty) {
       return const _BirdViewPlaceholder();
     }
-    return CustomPaint(
-      painter: _BirdViewPainter(
-        snapshot: effectiveSnapshot,
-        selectedNodeId: selectedNodeId,
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _BirdViewPainter(
+          snapshot: effectiveSnapshot,
+          selectedNodeId: selectedNodeId,
+        ),
       ),
     );
   }

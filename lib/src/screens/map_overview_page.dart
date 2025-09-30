@@ -496,15 +496,26 @@ class _MindMapCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AspectRatio(
-                  aspectRatio: 4 / 3,
+                Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(appCornerRadius - 2),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         color: colorScheme.primary.withOpacity(0.06),
                       ),
-                      child: _MindMapPreviewContent(preview: previewAsync),
+                      child: SizedBox.expand(
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: 4,
+                            height: 3,
+                            child: _MindMapPreviewContent(
+                              preview: previewAsync,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -527,10 +538,16 @@ class _MindMapCard extends ConsumerWidget {
                       icon: const Icon(Icons.delete_outline),
                       tooltip: 'Delete mind map',
                       onPressed: onDelete,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
+                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Text(
                   name,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -539,7 +556,7 @@ class _MindMapCard extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const Spacer(),
+                const SizedBox(height: 8),
                 Text(
                   'Tap to open',
                   style: theme.textTheme.bodySmall?.copyWith(
