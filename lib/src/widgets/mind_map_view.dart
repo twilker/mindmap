@@ -250,7 +250,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   void _scheduleLayoutSnapshotUpdate(MindMapLayoutResult layout) {
     final snapshot = layout.isEmpty
         ? null
-        : MindMapLayoutSnapshot(nodes: layout.nodes);
+        : MindMapLayoutSnapshot(nodes: layout.nodes, bounds: layout.bounds);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
