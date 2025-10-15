@@ -59,6 +59,13 @@ jobs:
       - name: Build Android app bundle
         run: flutter build appbundle --release
 
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-appbundle
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
   build_ios:
     runs-on: macos-latest
     steps:
@@ -75,6 +82,18 @@ jobs:
 
       - name: Build iOS app (no codesign)
         run: flutter build ios --no-codesign
+
+      - name: Archive iOS app bundle
+        run: |
+          cd build/ios/iphoneos
+          zip -r Runner.app.zip Runner.app
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-runner-app
+          path: build/ios/iphoneos/Runner.app.zip
+          if-no-files-found: error
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
