@@ -416,7 +416,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         alignment: Alignment.bottomRight,
         child: Padding(
           padding: const EdgeInsets.only(bottom: 20, right: 16),
-          child: const MindMapBirdView(),
+          child: MindMapBirdView(controller: _viewController),
         ),
       ),
     );
