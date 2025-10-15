@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -165,8 +164,43 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     final state = ref.watch(mindMapProvider);
     _lastSavedMarkdown ??= state.markdown;
     final mapName = ref.watch(currentMapNameProvider) ?? widget.mapName;
+    final isTouchOnly = _isTouchOnlyPlatform();
+
+    final stackChildren = <Widget>[
+      Positioned.fill(
+        child: MindMapView(
+          controller: _viewController,
+          touchOnlyMode: isTouchOnly,
+        ),
+      ),
+    ];
+
+    if (!isTouchOnly) {
+      stackChildren
+        ..add(_buildBirdViewOverlay())
+        ..add(_buildTopControls(mapName))
+        ..add(_buildViewControls())
+        ..add(_buildNodeActionBar(state));
+    }
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
+      extendBodyBehindAppBar: isTouchOnly,
+      appBar: isTouchOnly ? _buildTouchAppBar(mapName) : null,
+      floatingActionButtonLocation: isTouchOnly
+          ? FloatingActionButtonLocation.endFloat
+          : null,
+      floatingActionButton: isTouchOnly
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 16, right: 16),
+              child: FloatingActionButton(
+                heroTag: 'touch_reset_view',
+                onPressed: _viewController.resetView,
+                tooltip: 'Reset view',
+                child: const Icon(Icons.center_focus_strong),
+              ),
+            )
+          : null,
       body: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -175,16 +209,47 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
             end: Alignment.bottomCenter,
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned.fill(child: MindMapView(controller: _viewController)),
-            _buildBirdViewOverlay(),
-            _buildTopControls(mapName),
-            _buildViewControls(),
-            _buildNodeActionBar(state),
+        child: Stack(children: stackChildren),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildTouchAppBar(String mapName) {
+    final theme = Theme.of(context);
+    return AppBar(
+      backgroundColor: theme.colorScheme.surface,
+      elevation: 0,
+      title: Text(mapName, overflow: TextOverflow.ellipsis),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        tooltip: 'Back to overview',
+        onPressed: () {
+          Navigator.of(context).pop();
+        },
+      ),
+      actions: [
+        PopupMenuButton<_ExportAction>(
+          icon: const Icon(Icons.ios_share),
+          tooltip: 'Export',
+          onSelected: (value) {
+            switch (value) {
+              case _ExportAction.markdown:
+                _exportMarkdown();
+                break;
+              case _ExportAction.svg:
+                _exportSvg();
+                break;
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: _ExportAction.markdown,
+              child: Text('Export text'),
+            ),
+            PopupMenuItem(value: _ExportAction.svg, child: Text('Export SVG')),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -457,3 +522,5 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     return BirdViewRenderer.renderPreview(layout: layout);
   }
 }
+
+enum _ExportAction { markdown, svg }
