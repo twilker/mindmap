@@ -3,7 +3,7 @@
     <item android:drawable="@color/launch_background" />
     <item android:gravity="center">
         <shape android:shape="oval">
-            <size android:width="120dp" android:height="120dp" />
+            <size android:width="160dp" android:height="160dp" />
             <solid android:color="@color/splash_icon_background" />
         </shape>
     </item>

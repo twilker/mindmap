@@ -103,16 +103,17 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          padding: const EdgeInsets.all(0),
-          decoration: BoxDecoration(
-            gradient: AppColors.heroGradient,
-            color: Colors.white.withOpacity(0.6),
-            borderRadius: BorderRadius.circular(appCornerRadius),
+          width: 136,
+          height: 136,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
           ),
+          alignment: Alignment.center,
           child: SvgPicture.asset(
             'assets/logo/mindkite_mark_notail_light.svg',
-            height: 128,
-            width: 128,
+            height: 92,
+            width: 92,
           ),
         ),
         const SizedBox(width: 20),
