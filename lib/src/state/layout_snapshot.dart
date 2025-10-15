@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:ui';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,8 +10,11 @@ final mindMapLayoutSnapshotProvider = StateProvider<MindMapLayoutSnapshot?>(
 );
 
 class MindMapLayoutSnapshot {
-  MindMapLayoutSnapshot({required Map<String, NodeRenderData> nodes})
-    : nodes = UnmodifiableMapView(nodes);
+  MindMapLayoutSnapshot({
+    required Map<String, NodeRenderData> nodes,
+    required this.bounds,
+  }) : nodes = UnmodifiableMapView(nodes);
 
   final Map<String, NodeRenderData> nodes;
+  final Rect bounds;
 }

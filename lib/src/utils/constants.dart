@@ -20,6 +20,7 @@ const double zoomMinScale = 0.2;
 const double zoomMaxScale = 3.0;
 const double boundsMargin = 80;
 const double focusViewportMargin = 96;
+const double birdViewMinShortestSide = 600;
 
 const textStyle = TextStyle(
   fontSize: 16,

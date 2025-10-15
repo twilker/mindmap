@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,9 +11,12 @@ import '../layout/mind_map_layout.dart';
 import '../state/current_map.dart';
 import '../state/mind_map_state.dart';
 import '../state/mind_map_storage.dart';
+import '../state/mind_map_preview_storage.dart';
 import '../state/node_edit_request.dart';
+import '../utils/bird_view_renderer.dart';
 import '../utils/constants.dart';
 import '../utils/svg_exporter.dart';
+import '../widgets/mind_map_bird_view.dart';
 import '../widgets/mind_map_view.dart';
 import '../theme/app_colors.dart';
 
@@ -32,6 +36,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
   String? _currentMapName;
   String? _lastSavedMarkdown;
   String? _pendingMarkdown;
+  MindMapState? _pendingState;
   bool _saving = false;
 
   @override
@@ -73,6 +78,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
       return;
     }
     _pendingMarkdown = next.markdown;
+    _pendingState = next;
     if (_saving) {
       return;
     }
@@ -87,17 +93,27 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         break;
       }
       final pending = _pendingMarkdown!;
+      final pendingState = _pendingState;
       _pendingMarkdown = null;
+      _pendingState = null;
+      Uint8List? preview;
+      if (pendingState != null) {
+        preview = await _generateBirdViewPreview(pendingState);
+      }
       try {
         await ref
             .read(savedMapsProvider.notifier)
-            .save(name, pending, silent: true);
+            .save(name, pending, silent: true, preview: preview);
+        ref.invalidate(mindMapPreviewProvider(name));
         _lastSavedMarkdown = pending;
       } catch (err) {
         if (mounted) {
           _showMessage('Failed to save "$name": $err');
         }
         _pendingMarkdown ??= pending;
+        if (_pendingState == null && pendingState != null) {
+          _pendingState = pendingState;
+        }
         break;
       }
     }
@@ -162,6 +178,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         child: Stack(
           children: [
             Positioned.fill(child: MindMapView(controller: _viewController)),
+            _buildBirdViewOverlay(),
             _buildTopControls(mapName),
             _buildViewControls(),
             _buildNodeActionBar(state),
@@ -388,7 +405,27 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
+  Widget _buildBirdViewOverlay() {
+    if (!_shouldShowBirdView(context)) {
+      return const SizedBox.shrink();
+    }
+    return SafeArea(
+      left: false,
+      top: false,
+      child: Align(
+        alignment: Alignment.bottomRight,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 20, right: 16),
+          child: MindMapBirdView(controller: _viewController),
+        ),
+      ),
+    );
+  }
+
   bool _isTouchOnlyPlatform() {
+    if (kIsWeb) {
+      return false;
+    }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
       case TargetPlatform.fuchsia:
@@ -399,5 +436,24 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
       case TargetPlatform.windows:
         return false;
     }
+  }
+
+  bool _shouldShowBirdView(BuildContext context) {
+    if (_isTouchOnlyPlatform()) {
+      return false;
+    }
+    final size = MediaQuery.sizeOf(context);
+    return size.shortestSide >= birdViewMinShortestSide;
+  }
+
+  Future<Uint8List?> _generateBirdViewPreview(MindMapState state) async {
+    if (!mounted) {
+      return null;
+    }
+    final layout = MindMapLayoutEngine(
+      textStyle: textStyle,
+      textScaler: MediaQuery.textScalerOf(context),
+    ).layout(state.root);
+    return BirdViewRenderer.renderPreview(layout: layout);
   }
 }

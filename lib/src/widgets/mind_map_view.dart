@@ -7,6 +7,7 @@ import 'package:vector_math/vector_math_64.dart' as vm;
 import '../layout/mind_map_layout.dart';
 import '../state/mind_map_state.dart';
 import '../state/layout_snapshot.dart';
+import '../state/mind_map_viewport.dart';
 import '../utils/constants.dart';
 import 'node_card.dart';
 
@@ -34,6 +35,11 @@ class MindMapViewController {
 
   void focusOnNode(String id, {bool preferTopHalf = false}) =>
       _state?._focusOnNode(id, preferTopHalf: preferTopHalf);
+
+  void moveViewportToLayoutCenter(
+    Offset layoutCenter, {
+    bool animate = false,
+  }) => _state?._moveViewportToLayoutCenter(layoutCenter, animate: animate);
 }
 
 class MindMapView extends ConsumerStatefulWidget {
@@ -53,6 +59,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   int _lastAutoFitVersion = -1;
   Matrix4? _homeTransform;
   Size? _viewportSize;
+  Offset _contentOrigin = Offset.zero;
   String? _pendingFocusNodeId;
   bool _pendingPreferTopHalf = false;
   double _keyboardInset = 0;
@@ -64,6 +71,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   void initState() {
     super.initState();
     _controller = TransformationController();
+    _controller.addListener(_handleTransformChanged);
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -85,9 +93,15 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     widget.controller?._detach(this);
     _animation?.removeListener(_applyAnimatedValue);
     _animationController.dispose();
+    _controller.removeListener(_handleTransformChanged);
     _controller.dispose();
     ref.read(mindMapLayoutSnapshotProvider.notifier).state = null;
+    ref.read(mindMapViewportProvider.notifier).state = null;
     super.dispose();
+  }
+
+  void _handleTransformChanged() {
+    _notifyViewportChanged();
   }
 
   void _applyAnimatedValue() {
@@ -153,6 +167,27 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       ..scale(appliedFactor, appliedFactor, 1)
       ..translate(-focalPoint.dx, -focalPoint.dy);
     _controller.value = matrix.multiplied(current);
+  }
+
+  void _moveViewportToLayoutCenter(
+    Offset layoutCenter, {
+    bool animate = false,
+  }) {
+    final viewportSize = _viewportSize;
+    if (viewportSize == null) {
+      return;
+    }
+    final Offset childCenter = layoutCenter + _contentOrigin;
+    final double scale = _controller.value.getMaxScaleOnAxis();
+    final matrix = Matrix4.identity()
+      ..translate(viewportSize.width / 2, viewportSize.height / 2)
+      ..scale(scale, scale, 1)
+      ..translate(-childCenter.dx, -childCenter.dy);
+    if (animate) {
+      _animateTo(matrix);
+    } else {
+      _controller.value = matrix;
+    }
   }
 
   void _focusOnNode(String id, {bool preferTopHalf = false}) {
@@ -242,6 +277,14 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         _scheduleLayoutSnapshotUpdate(layout);
         _maybeFocusPending(layout, origin, viewportSize);
 
+        _contentOrigin = origin;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          _notifyViewportChanged();
+        });
+
         return _buildInteractiveViewer(layout, origin, contentSize);
       },
     );
@@ -250,7 +293,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   void _scheduleLayoutSnapshotUpdate(MindMapLayoutResult layout) {
     final snapshot = layout.isEmpty
         ? null
-        : MindMapLayoutSnapshot(nodes: layout.nodes);
+        : MindMapLayoutSnapshot(nodes: layout.nodes, bounds: layout.bounds);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -352,6 +395,18 @@ class _MindMapViewState extends ConsumerState<MindMapView>
           ),
         ),
       ),
+    );
+  }
+
+  void _notifyViewportChanged() {
+    final viewportSize = _viewportSize;
+    if (viewportSize == null || !mounted) {
+      return;
+    }
+    ref.read(mindMapViewportProvider.notifier).state = MindMapViewportSnapshot(
+      viewportSize: viewportSize,
+      transform: _controller.value.clone(),
+      origin: _contentOrigin,
     );
   }
 
