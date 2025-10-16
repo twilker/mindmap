@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:universal_html/html.dart' as html;
+import '../utils/file_exporter.dart';
 
 import '../layout/mind_map_layout.dart';
 import '../state/current_map.dart';
@@ -128,7 +127,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
 
   void _exportMarkdown() {
     final markdown = ref.read(mindMapProvider.notifier).exportMarkdown();
-    _downloadText('mindmap.txt', markdown, 'text/plain');
+    unawaited(_exportFile('mindmap.txt', markdown, 'text/plain'));
   }
 
   void _exportSvg() {
@@ -142,21 +141,20 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
       bounds: state.lastContentBounds ?? layout.bounds,
     );
     final svg = exporter.build();
-    _downloadText('mindmap.svg', svg, 'image/svg+xml');
+    unawaited(_exportFile('mindmap.svg', svg, 'image/svg+xml'));
   }
 
-  void _downloadText(String filename, String content, String mimeType) {
-    if (!kIsWeb) {
-      _showMessage('File export is supported on the web build of this sample.');
-      return;
+  Future<void> _exportFile(
+    String filename,
+    String content,
+    String mimeType,
+  ) async {
+    try {
+      await saveTextFile(filename, content, mimeType);
+    } catch (err) {
+      if (!mounted) return;
+      _showMessage('Failed to export $filename: $err');
     }
-    final bytes = utf8.encode(content);
-    final blob = html.Blob([Uint8List.fromList(bytes)], mimeType);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', filename)
-      ..click();
-    html.Url.revokeObjectUrl(url);
   }
 
   @override

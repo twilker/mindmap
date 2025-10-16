@@ -69,13 +69,8 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
                       ),
                       FilledButton.icon(
                         icon: const Icon(Icons.file_open),
-                        label: const Text('Import text'),
-                        onPressed: _busy ? null : _importMarkdown,
-                      ),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.cloud_upload_outlined),
-                        label: const Text('Import .mind'),
-                        onPressed: _busy ? null : _importMindFile,
+                        label: const Text('Import file'),
+                        onPressed: _busy ? null : _importMap,
                       ),
                     ],
                   ),
@@ -243,10 +238,10 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
     _showMessage('Created "$name"');
   }
 
-  Future<void> _importMarkdown() async {
+  Future<void> _importMap() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['txt', 'md'],
+      allowedExtensions: const ['txt', 'md', 'mind'],
       withData: true,
     );
     if (result == null || result.files.isEmpty) {
@@ -258,41 +253,15 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
       _showMessage('Unable to read ${file.name}.');
       return;
     }
-    final content = utf8.decode(bytes);
-    final converter = MindMapMarkdownConverter(const Uuid().v4);
-    final root = converter.fromMarkdown(content);
-    if (root == null) {
-      _showMessage('The selected file could not be parsed as a mind map.');
-      return;
-    }
-    final normalized = converter.toMarkdown(root);
-    await _createMapFromMarkdown(
-      normalized,
-      suggestedName: _suggestName(
-        _nameWithoutExtension(file.name),
-        ref.read(savedMapsProvider),
-      ),
-    );
-  }
 
-  Future<void> _importMindFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['mind'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) {
-      return;
-    }
-    final file = result.files.single;
-    final bytes = file.bytes;
-    if (bytes == null) {
-      _showMessage('Unable to read ${file.name}.');
-      return;
-    }
+    final extension = _extensionOf(file.name);
     setState(() => _busy = true);
     try {
-      final markdown = await MindmeisterImporter().toMarkdown(bytes);
+      final markdown = switch (extension) {
+        'mind' => await MindmeisterImporter().toMarkdown(bytes),
+        'txt' || 'md' || '' => _decodeMarkdown(bytes),
+        _ => throw FormatException('Unsupported file type: .$extension'),
+      };
       await _createMapFromMarkdown(
         markdown,
         suggestedName: _suggestName(
@@ -300,13 +269,35 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
           ref.read(savedMapsProvider),
         ),
       );
+    } on FormatException catch (err) {
+      _showMessage(err.message);
     } catch (err) {
-      _showMessage('Failed to import .mind file: $err');
+      _showMessage('Failed to import ${file.name}: $err');
     } finally {
       if (mounted) {
         setState(() => _busy = false);
       }
     }
+  }
+
+  String _extensionOf(String filename) {
+    final index = filename.lastIndexOf('.');
+    if (index == -1 || index == filename.length - 1) {
+      return '';
+    }
+    return filename.substring(index + 1).toLowerCase();
+  }
+
+  String _decodeMarkdown(Uint8List bytes) {
+    final content = utf8.decode(bytes);
+    final converter = MindMapMarkdownConverter(const Uuid().v4);
+    final root = converter.fromMarkdown(content);
+    if (root == null) {
+      throw const FormatException(
+        'The selected file could not be parsed as a mind map.',
+      );
+    }
+    return converter.toMarkdown(root);
   }
 
   Future<void> _createMapFromMarkdown(
