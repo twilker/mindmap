@@ -353,6 +353,23 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
               ),
             ),
           ),
+          if (widget.data.node.details.trim().isNotEmpty)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: widget.accentColor.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.article_outlined,
+                  size: 14,
+                  color: widget.accentColor,
+                ),
+              ),
+            ),
         ],
       ),
     );

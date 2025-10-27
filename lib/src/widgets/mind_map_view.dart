@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vector_math/vector_math_64.dart' as vm;
 
@@ -11,6 +12,7 @@ import '../state/mind_map_viewport.dart';
 import '../state/node_edit_request.dart';
 import '../utils/constants.dart';
 import 'node_card.dart';
+import 'node_details_dialog.dart';
 
 class MindMapViewController {
   _MindMapViewState? _state;
@@ -317,6 +319,12 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   ) {
     final selectedId = mindMapState.selectedNodeId;
     final nodes = layout.nodes.values.toList();
+    final detailsCard = _buildSelectedNodeDetailsCard(
+      layout,
+      origin,
+      mindMapState,
+      contentSize,
+    );
 
     bool isPointOnNode(Offset localPosition) {
       final inverse = Matrix4.inverted(_controller.value);
@@ -397,6 +405,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                     ),
                   ),
                 ),
+              if (detailsCard != null) detailsCard,
               if (widget.touchOnlyMode &&
                   selectedId != null &&
                   _editingNodeId == null)
@@ -486,6 +495,60 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     ];
   }
 
+  Widget? _buildSelectedNodeDetailsCard(
+    MindMapLayoutResult layout,
+    Offset origin,
+    MindMapState state,
+    Size contentSize,
+  ) {
+    final selectedId = state.selectedNodeId;
+    if (selectedId == null) {
+      return null;
+    }
+    final data = layout.nodes[selectedId];
+    if (data == null) {
+      return null;
+    }
+    final details = data.node.details.trim();
+    if (details.isEmpty) {
+      return null;
+    }
+    const double horizontalPadding = 16;
+    final double cardWidth = min(360.0, max(220.0, data.size.width + 120));
+    final double desiredLeft =
+        data.center.dx + origin.dx - cardWidth / 2;
+    final double maxLeft =
+        max(horizontalPadding, contentSize.width - cardWidth - horizontalPadding);
+    final double left = desiredLeft.clamp(horizontalPadding, maxLeft);
+    final double top =
+        data.topLeft.dy + origin.dy + data.size.height + 12;
+    final theme = Theme.of(context);
+    final styleSheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
+      blockSpacing: 12,
+    );
+    return Positioned(
+      left: left,
+      top: top,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360, minWidth: 200),
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          color: theme.colorScheme.surface,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: MarkdownBody(
+              data: details,
+              shrinkWrap: true,
+              softLineBreak: true,
+              styleSheet: styleSheet,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _touchActionButton({
     required IconData icon,
     required String tooltip,
@@ -505,6 +568,23 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     );
   }
 
+  Future<void> _editNodeDetails(String nodeId) async {
+    final notifier = ref.read(mindMapProvider.notifier);
+    final node = notifier.nodeById(nodeId);
+    if (node == null) {
+      return;
+    }
+    notifier.selectNode(nodeId);
+    final result = await showNodeDetailsEditorDialog(
+      context,
+      title: 'Edit details',
+      initialValue: node.details,
+    );
+    if (result != null) {
+      notifier.updateNodeDetails(nodeId, result);
+    }
+  }
+
   Future<void> _showNodeActionsSheet(
     String nodeId, {
     required bool canDelete,
@@ -522,6 +602,14 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                 onTap: () {
                   Navigator.of(context).pop();
                   _startEditingNode(nodeId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.article_outlined),
+                title: const Text('Edit details'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _editNodeDetails(nodeId);
                 },
               ),
               ListTile(

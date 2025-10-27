@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/mind_map_node.dart';
+import '../utils/json_converter.dart';
 import '../utils/markdown_converter.dart';
 
 const _defaultRootText = 'Central Topic';
@@ -18,21 +19,21 @@ final mindMapProvider = StateNotifierProvider<MindMapNotifier, MindMapState>((
 class MindMapState {
   MindMapState({
     required this.root,
-    required this.markdown,
+    required this.document,
     required this.selectedNodeId,
     required this.autoFitVersion,
     this.lastContentBounds,
   });
 
   final MindMapNode root;
-  final String markdown;
+  final String document;
   final String? selectedNodeId;
   final int autoFitVersion;
   final Rect? lastContentBounds;
 
   MindMapState copyWith({
     MindMapNode? root,
-    String? markdown,
+    String? document,
     String? selectedNodeId,
     int? autoFitVersion,
     Rect? lastContentBounds,
@@ -40,7 +41,7 @@ class MindMapState {
   }) {
     return MindMapState(
       root: root ?? this.root,
-      markdown: markdown ?? this.markdown,
+      document: document ?? this.document,
       selectedNodeId: selectedNodeId ?? this.selectedNodeId,
       autoFitVersion: autoFitVersion ?? this.autoFitVersion,
       lastContentBounds: updateBounds
@@ -52,24 +53,27 @@ class MindMapState {
 
 class MindMapNotifier extends StateNotifier<MindMapState> {
   MindMapNotifier() : _uuid = const Uuid(), super(_initialState()) {
-    _converter = MindMapMarkdownConverter(_nextId);
-    final markdown = _converter.toMarkdown(state.root);
-    state = state.copyWith(markdown: markdown, selectedNodeId: state.root.id);
+    _markdownConverter = MindMapMarkdownConverter(_nextId);
+    _jsonConverter = const MindMapJsonConverter();
+    final document = _jsonConverter.toJson(state.root);
+    state = state.copyWith(document: document, selectedNodeId: state.root.id);
   }
 
   final Uuid _uuid;
-  late MindMapMarkdownConverter _converter;
+  late MindMapMarkdownConverter _markdownConverter;
+  late MindMapJsonConverter _jsonConverter;
 
   static MindMapState _initialState() {
     final uuid = const Uuid();
     final root = MindMapNode(
       id: uuid.v4(),
       text: _defaultRootText,
+      details: '',
       children: const [],
     );
     return MindMapState(
       root: root,
-      markdown: '',
+      document: '',
       selectedNodeId: root.id,
       autoFitVersion: 1,
     );
@@ -77,8 +81,12 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
 
   String _nextId() => _uuid.v4();
 
-  MindMapNode _createNode(String text) =>
-      MindMapNode(id: _nextId(), text: text, children: const []);
+  MindMapNode _createNode(String text) => MindMapNode(
+        id: _nextId(),
+        text: text,
+        details: '',
+        children: const [],
+      );
 
   void selectNode(String id) {
     if (_findNode(state.root, id) == null) {
@@ -92,6 +100,19 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
       state.root,
       id,
       (node) => node.copyWith(text: text),
+    );
+    if (!result.modified) {
+      return;
+    }
+    _updateState(result.node, selectedId: id);
+  }
+
+  void updateNodeDetails(String id, String details) {
+    final normalized = details.replaceAll('\r\n', '\n');
+    final result = _replaceNode(
+      state.root,
+      id,
+      (node) => node.copyWith(details: normalized),
     );
     if (!result.modified) {
       return;
@@ -159,11 +180,25 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
   }
 
   void importFromMarkdown(String text) {
-    final parsed = _converter.fromMarkdown(text);
+    final parsed = _markdownConverter.fromMarkdown(text);
     if (parsed == null) {
       return;
     }
-    _converter = MindMapMarkdownConverter(_nextId);
+    _markdownConverter = MindMapMarkdownConverter(_nextId);
+    _updateState(
+      parsed,
+      selectedId: parsed.id,
+      autoFit: true,
+      resetBounds: true,
+    );
+  }
+
+  void importFromJson(String json) {
+    final parsed = _jsonConverter.fromJson(json);
+    if (parsed == null) {
+      return;
+    }
+    _markdownConverter = MindMapMarkdownConverter(_nextId);
     _updateState(
       parsed,
       selectedId: parsed.id,
@@ -176,7 +211,11 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
     _updateState(root, selectedId: root.id, autoFit: true, resetBounds: true);
   }
 
-  String exportMarkdown() => state.markdown;
+  String exportMarkdown() => _markdownConverter.toMarkdown(state.root);
+
+  String exportJson() => state.document;
+
+  MindMapNode? nodeById(String id) => _findNode(state.root, id);
 
   void requestAutoFit() {
     state = state.copyWith(autoFitVersion: state.autoFitVersion + 1);
@@ -222,13 +261,13 @@ class MindMapNotifier extends StateNotifier<MindMapState> {
     bool autoFit = false,
     bool resetBounds = false,
   }) {
-    final markdown = _converter.toMarkdown(root);
+    final document = _jsonConverter.toJson(root);
     final selection = selectedId ?? state.selectedNodeId;
     final hasSelection =
         selection != null && _findNode(root, selection) != null;
     state = state.copyWith(
       root: root,
-      markdown: markdown,
+      document: document,
       selectedNodeId: hasSelection ? selection : root.id,
       autoFitVersion: autoFit ? state.autoFitVersion + 1 : state.autoFitVersion,
       lastContentBounds: resetBounds ? null : state.lastContentBounds,
