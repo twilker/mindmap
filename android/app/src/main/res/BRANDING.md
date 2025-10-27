@@ -1,4 +1,7 @@
-# MindKite branding assets
+# MindKite Android brand assets
 
-- `drawable/launch_background.xml` and `drawable-v21/launch_background.xml` blend a MindKite gradient (#6D69FF → #00E5FF) and overlay the branded kite mark from `drawable-nodpi/mindkite_splash_foreground.png` to show the new splash experience on Android cold starts.
-- `mipmap-*/ic_launcher.png` files were regenerated with the same gradient background and kite mark so the Android launcher icon matches the refreshed brand.
+- `drawable/launch_background.xml`, `drawable-v21/launch_background.xml`, and `drawable-nodpi/launch_background.xml` paint the MindKite
+  app background color behind a centered white icon pill and render the kite mark vector for pre-Android 12 splash screens.
+- `values/` color resources provide the shared splash background and icon background colors.
+- `values-v31/` styles opt in to Android 12+'s system splash screen API so the same colors and vector icon are used on modern
+  devices when the OS draws the launch experience.

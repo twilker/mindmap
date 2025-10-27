@@ -8,6 +8,7 @@ import '../layout/mind_map_layout.dart';
 import '../state/mind_map_state.dart';
 import '../state/layout_snapshot.dart';
 import '../state/mind_map_viewport.dart';
+import '../state/node_edit_request.dart';
 import '../utils/constants.dart';
 import 'node_card.dart';
 
@@ -43,9 +44,10 @@ class MindMapViewController {
 }
 
 class MindMapView extends ConsumerStatefulWidget {
-  const MindMapView({super.key, this.controller});
+  const MindMapView({super.key, this.controller, this.touchOnlyMode = false});
 
   final MindMapViewController? controller;
+  final bool touchOnlyMode;
 
   @override
   ConsumerState<MindMapView> createState() => _MindMapViewState();
@@ -285,7 +287,12 @@ class _MindMapViewState extends ConsumerState<MindMapView>
           _notifyViewportChanged();
         });
 
-        return _buildInteractiveViewer(layout, origin, contentSize);
+        return _buildInteractiveViewer(
+          layout,
+          origin,
+          contentSize,
+          mindMapState,
+        );
       },
     );
   }
@@ -306,10 +313,9 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     MindMapLayoutResult layout,
     Offset origin,
     Size contentSize,
+    MindMapState mindMapState,
   ) {
-    final selectedId = ref.watch(
-      mindMapProvider.select((s) => s.selectedNodeId),
-    );
+    final selectedId = mindMapState.selectedNodeId;
     final nodes = layout.nodes.values.toList();
 
     bool isPointOnNode(Offset localPosition) {
@@ -391,11 +397,158 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                     ),
                   ),
                 ),
+              if (widget.touchOnlyMode &&
+                  selectedId != null &&
+                  _editingNodeId == null)
+                ..._buildTouchNodeActions(
+                  layout,
+                  origin,
+                  mindMapState,
+                  selectedId,
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Iterable<Widget> _buildTouchNodeActions(
+    MindMapLayoutResult layout,
+    Offset origin,
+    MindMapState mindMapState,
+    String selectedId,
+  ) {
+    final data = layout.nodes[selectedId];
+    if (data == null) {
+      return const [];
+    }
+    final notifier = ref.read(mindMapProvider.notifier);
+    final nodeRect = Rect.fromLTWH(
+      data.topLeft.dx + origin.dx,
+      data.topLeft.dy + origin.dy,
+      data.size.width,
+      data.size.height,
+    );
+    const double buttonSize = 44;
+    const double spacing = 12;
+    final double centerX = nodeRect.left + nodeRect.width / 2;
+    final double centerY = nodeRect.top + nodeRect.height / 2;
+    final bool isLeft = data.isLeft;
+    final double childLeft = isLeft
+        ? nodeRect.left - spacing - buttonSize
+        : nodeRect.right + spacing;
+    final double menuLeft = isLeft
+        ? nodeRect.right + spacing
+        : nodeRect.left - spacing - buttonSize;
+    final canDelete = mindMapState.root.id != selectedId;
+
+    return [
+      Positioned(
+        left: childLeft,
+        top: centerY - buttonSize / 2,
+        child: _touchActionButton(
+          icon: Icons.add,
+          tooltip: 'Add child',
+          onPressed: () {
+            final newId = notifier.addChild(selectedId);
+            if (newId != null) {
+              widget.controller?.focusOnNode(newId);
+            }
+          },
+        ),
+      ),
+      Positioned(
+        left: centerX - buttonSize / 2,
+        top: nodeRect.bottom + spacing,
+        child: _touchActionButton(
+          icon: Icons.add_circle_outline,
+          tooltip: 'Add sibling',
+          onPressed: () {
+            final newId = notifier.addSibling(selectedId);
+            if (newId != null) {
+              widget.controller?.focusOnNode(newId);
+            }
+          },
+        ),
+      ),
+      Positioned(
+        left: menuLeft,
+        top: centerY - buttonSize / 2,
+        child: _touchActionButton(
+          icon: Icons.menu,
+          tooltip: 'Node actions',
+          onPressed: () {
+            _showNodeActionsSheet(selectedId, canDelete: canDelete);
+          },
+        ),
+      ),
+    ];
+  }
+
+  Widget _touchActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: RawMaterialButton(
+        onPressed: onPressed,
+        elevation: 2,
+        constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+        shape: const CircleBorder(),
+        fillColor: theme.colorScheme.surface,
+        child: Icon(icon, size: 22),
+      ),
+    );
+  }
+
+  Future<void> _showNodeActionsSheet(
+    String nodeId, {
+    required bool canDelete,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Edit node'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _startEditingNode(nodeId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Delete node'),
+                enabled: canDelete,
+                onTap: canDelete
+                    ? () {
+                        Navigator.of(context).pop();
+                        ref.read(mindMapProvider.notifier).removeNode(nodeId);
+                      }
+                    : null,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _startEditingNode(String nodeId) {
+    final notifier = ref.read(mindMapProvider.notifier);
+    notifier.selectNode(nodeId);
+    final editRequest = ref.read(nodeEditRequestProvider.notifier);
+    editRequest.state = null;
+    editRequest.state = nodeId;
+    widget.controller?.focusOnNode(nodeId, preferTopHalf: widget.touchOnlyMode);
   }
 
   void _notifyViewportChanged() {
