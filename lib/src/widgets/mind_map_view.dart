@@ -70,6 +70,8 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   String? _editingNodeId;
   bool _editingPreferTopHalf = false;
   Offset? _pendingDoubleTapPosition;
+  final GlobalKey _detailsCardKey = GlobalKey();
+  double _detailsCardBottom = 0;
 
   @override
   void initState() {
@@ -106,6 +108,33 @@ class _MindMapViewState extends ConsumerState<MindMapView>
 
   void _handleTransformChanged() {
     _notifyViewportChanged();
+  }
+
+  void _updateDetailsCardExtent(double top, double height) {
+    final bottom = top + height;
+    if ((_detailsCardBottom - bottom).abs() < 0.5) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _detailsCardBottom = bottom;
+    });
+  }
+
+  void _clearDetailsCardExtent() {
+    if (_detailsCardBottom == 0) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _detailsCardBottom == 0) {
+        return;
+      }
+      setState(() {
+        _detailsCardBottom = 0;
+      });
+    });
   }
 
   void _applyAnimatedValue() {
@@ -325,6 +354,13 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       mindMapState,
       contentSize,
     );
+    final double canvasWidth = max(contentSize.width, 1);
+    final double canvasHeight = max(
+      contentSize.height,
+      detailsCard != null && _detailsCardBottom > 0
+          ? _detailsCardBottom + 24
+          : 1,
+    );
 
     bool isPointOnNode(Offset localPosition) {
       final inverse = Matrix4.inverted(_controller.value);
@@ -366,8 +402,8 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         boundaryMargin: const EdgeInsets.all(double.infinity),
         constrained: false,
         child: SizedBox(
-          width: max(contentSize.width, 1),
-          height: max(contentSize.height, 1),
+          width: canvasWidth,
+          height: canvasHeight,
           child: Stack(
             children: [
               CustomPaint(
@@ -414,6 +450,8 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                   origin,
                   mindMapState,
                   selectedId,
+                  detailsCardBottom:
+                      detailsCard != null ? _detailsCardBottom : 0,
                 ),
             ],
           ),
@@ -426,8 +464,9 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     MindMapLayoutResult layout,
     Offset origin,
     MindMapState mindMapState,
-    String selectedId,
-  ) {
+    String selectedId, {
+    double detailsCardBottom = 0,
+  }) {
     final data = layout.nodes[selectedId];
     if (data == null) {
       return const [];
@@ -451,6 +490,12 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         ? nodeRect.right + spacing
         : nodeRect.left - spacing - buttonSize;
     final canDelete = mindMapState.root.id != selectedId;
+    final bool hasDetailsCard =
+        mindMapState.selectedNodeId == selectedId && detailsCardBottom > 0;
+    final double siblingTopBase = nodeRect.bottom + spacing;
+    final double siblingTop = hasDetailsCard
+        ? max(siblingTopBase, detailsCardBottom + spacing)
+        : siblingTopBase;
 
     return [
       Positioned(
@@ -469,7 +514,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       ),
       Positioned(
         left: centerX - buttonSize / 2,
-        top: nodeRect.bottom + spacing,
+        top: siblingTop,
         child: _touchActionButton(
           icon: Icons.add_circle_outline,
           tooltip: 'Add sibling',
@@ -503,14 +548,21 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   ) {
     final selectedId = state.selectedNodeId;
     if (selectedId == null) {
+      _clearDetailsCardExtent();
       return null;
     }
     final data = layout.nodes[selectedId];
     if (data == null) {
+      _clearDetailsCardExtent();
+      return null;
+    }
+    if (widget.touchOnlyMode && _editingNodeId != null) {
+      _clearDetailsCardExtent();
       return null;
     }
     final details = data.node.details.trim();
     if (details.isEmpty) {
+      _clearDetailsCardExtent();
       return null;
     }
     const double horizontalPadding = 16;
@@ -526,12 +578,23 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     final styleSheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       blockSpacing: 12,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final context = _detailsCardKey.currentContext;
+      final size = context?.size;
+      if (size != null) {
+        _updateDetailsCardExtent(top, size.height);
+      }
+    });
     return Positioned(
       left: left,
       top: top,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360, minWidth: 200),
         child: Material(
+          key: _detailsCardKey,
           elevation: 4,
           borderRadius: BorderRadius.circular(12),
           color: theme.colorScheme.surface,
