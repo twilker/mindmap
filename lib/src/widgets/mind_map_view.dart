@@ -57,6 +57,9 @@ class MindMapView extends ConsumerStatefulWidget {
 
 class _MindMapViewState extends ConsumerState<MindMapView>
     with SingleTickerProviderStateMixin {
+  static const double _touchActionSpacing = 12;
+  static const double _touchActionButtonSize = 44;
+
   late final TransformationController _controller;
   late final AnimationController _animationController;
   Animation<Matrix4>? _animation;
@@ -450,8 +453,6 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                   origin,
                   mindMapState,
                   selectedId,
-                  detailsCardBottom:
-                      detailsCard != null ? _detailsCardBottom : 0,
                 ),
             ],
           ),
@@ -464,9 +465,8 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     MindMapLayoutResult layout,
     Offset origin,
     MindMapState mindMapState,
-    String selectedId, {
-    double detailsCardBottom = 0,
-  }) {
+    String selectedId,
+  ) {
     final data = layout.nodes[selectedId];
     if (data == null) {
       return const [];
@@ -478,8 +478,8 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       data.size.width,
       data.size.height,
     );
-    const double buttonSize = 44;
-    const double spacing = 12;
+    final double buttonSize = _touchActionButtonSize;
+    final double spacing = _touchActionSpacing;
     final double centerX = nodeRect.left + nodeRect.width / 2;
     final double centerY = nodeRect.top + nodeRect.height / 2;
     final bool isLeft = data.isLeft;
@@ -490,12 +490,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         ? nodeRect.right + spacing
         : nodeRect.left - spacing - buttonSize;
     final canDelete = mindMapState.root.id != selectedId;
-    final bool hasDetailsCard =
-        mindMapState.selectedNodeId == selectedId && detailsCardBottom > 0;
-    final double siblingTopBase = nodeRect.bottom + spacing;
-    final double siblingTop = hasDetailsCard
-        ? max(siblingTopBase, detailsCardBottom + spacing)
-        : siblingTopBase;
+    final double siblingTop = nodeRect.bottom + spacing;
 
     return [
       Positioned(
@@ -572,8 +567,11 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     final double maxLeft =
         max(horizontalPadding, contentSize.width - cardWidth - horizontalPadding);
     final double left = desiredLeft.clamp(horizontalPadding, maxLeft);
-    final double top =
-        data.topLeft.dy + origin.dy + data.size.height + 12;
+    final double baseTop =
+        data.topLeft.dy + origin.dy + data.size.height + _touchActionSpacing;
+    final double top = widget.touchOnlyMode
+        ? baseTop + _touchActionButtonSize + _touchActionSpacing
+        : baseTop;
     final theme = Theme.of(context);
     final styleSheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       blockSpacing: 12,
