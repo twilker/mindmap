@@ -16,11 +16,13 @@ const double nodeCaretGap = 1;
 const double nodeCaretMargin = nodeCursorWidth + nodeCaretGap;
 const double nodeHorizontalGap = 80;
 const double nodeVerticalGap = 24;
+const double touchNodeVerticalGap = 56;
 const double zoomMinScale = 0.2;
 const double zoomMaxScale = 3.0;
 const double boundsMargin = 80;
 const double focusViewportMargin = 96;
 const double birdViewMinShortestSide = 600;
+const double touchModeDiagonalInchesThreshold = 13.0;
 
 const textStyle = TextStyle(
   fontSize: 16,

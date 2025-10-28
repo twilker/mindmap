@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +19,7 @@ class MindMapNodeCard extends ConsumerStatefulWidget {
     required this.data,
     required this.isSelected,
     required this.accentColor,
+    required this.touchOnlyMode,
     this.onRequestFocusOnNode,
     this.onEditingChanged,
     super.key,
@@ -28,6 +28,7 @@ class MindMapNodeCard extends ConsumerStatefulWidget {
   final NodeRenderData data;
   final bool isSelected;
   final Color accentColor;
+  final bool touchOnlyMode;
   final FocusOnNodeCallback? onRequestFocusOnNode;
   final NodeEditingChangedCallback? onEditingChanged;
 
@@ -224,7 +225,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
 
   void _handleTap() {
     ref.read(mindMapProvider.notifier).selectNode(widget.data.node.id);
-    if (!_isTouchOnlyDevice()) {
+    if (!widget.touchOnlyMode) {
       _startEditing();
     }
   }
@@ -240,7 +241,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     }
     widget.onRequestFocusOnNode?.call(
       widget.data.node.id,
-      preferTopHalf: _isTouchOnlyDevice(),
+      preferTopHalf: widget.touchOnlyMode,
     );
   }
 
@@ -251,7 +252,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     widget.onEditingChanged?.call(
       widget.data.node.id,
       _focusNode.hasFocus,
-      preferTopHalf: _isTouchOnlyDevice(),
+      preferTopHalf: widget.touchOnlyMode,
     );
     if (mounted) {
       setState(() {});
@@ -270,7 +271,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
   }
 
   void _scheduleFocusRequest() {
-    if (_isTouchOnlyDevice() || _focusNode.hasFocus || _pendingFocusRequest) {
+    if (widget.touchOnlyMode || _focusNode.hasFocus || _pendingFocusRequest) {
       return;
     }
     _pendingFocusRequest = true;
@@ -285,19 +286,6 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
     });
   }
 
-  bool _isTouchOnlyDevice() {
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.iOS:
-        return true;
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-      case TargetPlatform.windows:
-        return false;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -305,7 +293,7 @@ class _MindMapNodeCardState extends ConsumerState<MindMapNodeCard> {
         ? widget.accentColor
         : AppColors.graphSlate.withOpacity(0.16);
     final backgroundColor = theme.colorScheme.surface;
-    final isTouchOnly = _isTouchOnlyDevice();
+    final isTouchOnly = widget.touchOnlyMode;
     final ignoreTextInput = isTouchOnly && !_focusNode.hasFocus;
     return GestureDetector(
       onTap: _handleTap,

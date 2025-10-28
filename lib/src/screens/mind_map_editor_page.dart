@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/file_exporter.dart';
@@ -13,6 +13,7 @@ import '../state/mind_map_preview_storage.dart';
 import '../utils/bird_view_renderer.dart';
 import '../utils/constants.dart';
 import '../utils/svg_exporter.dart';
+import '../utils/touch_mode.dart';
 import '../widgets/mind_map_bird_view.dart';
 import '../widgets/mind_map_view.dart';
 import '../widgets/node_details_dialog.dart';
@@ -179,7 +180,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     final state = ref.watch(mindMapProvider);
     _lastSavedDocument ??= state.document;
     final mapName = ref.watch(currentMapNameProvider) ?? widget.mapName;
-    final isTouchOnly = _isTouchOnlyPlatform();
+    final isTouchOnly = TouchModeResolver.isTouchOnly(context);
 
     final stackChildren = <Widget>[
       Positioned.fill(
@@ -192,7 +193,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
 
     if (!isTouchOnly) {
       stackChildren
-        ..add(_buildBirdViewOverlay())
+        ..add(_buildBirdViewOverlay(isTouchOnly))
         ..add(_buildTopControls(mapName))
         ..add(_buildViewControls())
         ..add(_buildNodeActionBar(state));
@@ -476,8 +477,8 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
-  Widget _buildBirdViewOverlay() {
-    if (!_shouldShowBirdView(context)) {
+  Widget _buildBirdViewOverlay(bool isTouchOnly) {
+    if (!_shouldShowBirdView(context, isTouchOnly)) {
       return const SizedBox.shrink();
     }
     return SafeArea(
@@ -493,24 +494,8 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
-  bool _isTouchOnlyPlatform() {
-    if (kIsWeb) {
-      return false;
-    }
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.iOS:
-        return true;
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-      case TargetPlatform.windows:
-        return false;
-    }
-  }
-
-  bool _shouldShowBirdView(BuildContext context) {
-    if (_isTouchOnlyPlatform()) {
+  bool _shouldShowBirdView(BuildContext context, bool isTouchOnly) {
+    if (isTouchOnly) {
       return false;
     }
     final size = MediaQuery.sizeOf(context);

@@ -290,6 +290,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     final layoutEngine = MindMapLayoutEngine(
       textStyle: textStyle,
       textScaler: MediaQuery.textScalerOf(context),
+      verticalGap: widget.touchOnlyMode ? touchNodeVerticalGap : null,
     );
     final layout = layoutEngine.layout(mindMapState.root);
     final origin = Offset(
@@ -428,6 +429,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                                   ? data.branchIndex
                                   : 0) %
                               branchColors.length],
+                      touchOnlyMode: widget.touchOnlyMode,
                       onRequestFocusOnNode: widget.controller == null
                           ? null
                           : (id, {bool preferTopHalf = false}) => widget
@@ -562,10 +564,11 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     }
     const double horizontalPadding = 16;
     final double cardWidth = min(360.0, max(220.0, data.size.width + 120));
-    final double desiredLeft =
-        data.center.dx + origin.dx - cardWidth / 2;
-    final double maxLeft =
-        max(horizontalPadding, contentSize.width - cardWidth - horizontalPadding);
+    final double desiredLeft = data.center.dx + origin.dx - cardWidth / 2;
+    final double maxLeft = max(
+      horizontalPadding,
+      contentSize.width - cardWidth - horizontalPadding,
+    );
     final double left = desiredLeft.clamp(horizontalPadding, maxLeft);
     final double baseTop =
         data.topLeft.dy + origin.dy + data.size.height + _touchActionSpacing;
@@ -573,9 +576,9 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         ? baseTop + _touchActionButtonSize + _touchActionSpacing
         : baseTop;
     final theme = Theme.of(context);
-    final styleSheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
-      blockSpacing: 12,
-    );
+    final styleSheet = MarkdownStyleSheet.fromTheme(
+      theme,
+    ).copyWith(blockSpacing: 12);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;

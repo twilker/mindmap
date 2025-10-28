@@ -44,11 +44,16 @@ class NodeRenderData {
 }
 
 class MindMapLayoutEngine {
-  MindMapLayoutEngine({required this.textStyle, TextScaler? textScaler})
-    : textScaler = textScaler ?? TextScaler.noScaling;
+  MindMapLayoutEngine({
+    required this.textStyle,
+    TextScaler? textScaler,
+    double? verticalGap,
+  }) : textScaler = textScaler ?? TextScaler.noScaling,
+       verticalGap = verticalGap ?? nodeVerticalGap;
 
   final TextStyle textStyle;
   final TextScaler textScaler;
+  final double verticalGap;
 
   MindMapLayoutResult layout(MindMapNode root) {
     final measuredRoot = _measure(root);
@@ -121,7 +126,7 @@ class MindMapLayoutEngine {
       );
       currentLeftY += branch.node.totalHeight;
       if (i < left.length - 1) {
-        currentLeftY += nodeVerticalGap;
+        currentLeftY += verticalGap;
       }
     }
 
@@ -146,7 +151,7 @@ class MindMapLayoutEngine {
       );
       currentRightY += branch.node.totalHeight;
       if (i < right.length - 1) {
-        currentRightY += nodeVerticalGap;
+        currentRightY += verticalGap;
       }
     }
 
@@ -341,7 +346,7 @@ class MindMapLayoutEngine {
       );
       currentY += child.totalHeight;
       if (i < measured.children.length - 1) {
-        currentY += nodeVerticalGap;
+        currentY += verticalGap;
       }
     }
   }
@@ -353,7 +358,7 @@ class MindMapLayoutEngine {
     var total = 0.0;
     for (var i = 0; i < nodes.length; i++) {
       if (i > 0) {
-        total += nodeVerticalGap;
+        total += verticalGap;
       }
       total += nodes[i].totalHeight;
     }
