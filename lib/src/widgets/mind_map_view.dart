@@ -58,6 +58,7 @@ class MindMapView extends ConsumerStatefulWidget {
 class _MindMapViewState extends ConsumerState<MindMapView>
     with SingleTickerProviderStateMixin {
   static const double _touchActionSpacing = 12;
+  static const double _touchActionButtonOffset = _touchActionSpacing / 2;
   static const double _touchActionButtonSize = 44;
 
   late final TransformationController _controller;
@@ -481,18 +482,18 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       data.size.height,
     );
     final double buttonSize = _touchActionButtonSize;
-    final double spacing = _touchActionSpacing;
+    final double buttonOffset = _touchActionButtonOffset;
     final double centerX = nodeRect.left + nodeRect.width / 2;
     final double centerY = nodeRect.top + nodeRect.height / 2;
     final bool isLeft = data.isLeft;
     final double childLeft = isLeft
-        ? nodeRect.left - spacing - buttonSize
-        : nodeRect.right + spacing;
+        ? nodeRect.left - buttonOffset - buttonSize
+        : nodeRect.right + buttonOffset;
     final double menuLeft = isLeft
-        ? nodeRect.right + spacing
-        : nodeRect.left - spacing - buttonSize;
+        ? nodeRect.right + buttonOffset
+        : nodeRect.left - buttonOffset - buttonSize;
     final canDelete = mindMapState.root.id != selectedId;
-    final double siblingTop = nodeRect.bottom + spacing;
+    final double siblingTop = nodeRect.bottom + buttonOffset;
 
     return [
       Positioned(
@@ -572,9 +573,13 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     final double left = desiredLeft.clamp(horizontalPadding, maxLeft);
     final double baseTop =
         data.topLeft.dy + origin.dy + data.size.height + _touchActionSpacing;
-    final double top = widget.touchOnlyMode
-        ? baseTop + _touchActionButtonSize + _touchActionSpacing
-        : baseTop;
+    final double touchTop = data.topLeft.dy +
+        origin.dy +
+        data.size.height +
+        _touchActionButtonOffset +
+        _touchActionButtonSize +
+        _touchActionSpacing;
+    final double top = widget.touchOnlyMode ? touchTop : baseTop;
     final theme = Theme.of(context);
     final styleSheet = MarkdownStyleSheet.fromTheme(
       theme,
