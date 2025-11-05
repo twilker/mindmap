@@ -11,6 +11,23 @@ class MindMapMarkdownConverter {
     final indent = ' ' * (depth * 4);
     final line = '$indent- ${node.text.trim()}';
     final lines = <String>[line];
+    final rawDetails = node.details.replaceAll('\r', '');
+    if (rawDetails.trim().isNotEmpty) {
+      final detailsIndent = ' ' * ((depth + 1) * 4);
+      final paragraphs = rawDetails.split(RegExp(r'\n\s*\n'));
+      final continuationIndent = '$detailsIndent   ';
+      for (final paragraph in paragraphs) {
+        if (paragraph.trim().isEmpty) {
+          continue;
+        }
+        final paragraphLines = paragraph.split('\n');
+        final firstLine = paragraphLines.first;
+        lines.add('$detailsIndent-> $firstLine');
+        for (var i = 1; i < paragraphLines.length; i++) {
+          lines.add('$continuationIndent${paragraphLines[i]}');
+        }
+      }
+    }
     for (final child in node.children) {
       lines.addAll(toMarkdownLines(child, depth: depth + 1));
     }
@@ -25,12 +42,61 @@ class MindMapMarkdownConverter {
     _MutableNode? root;
     final stack = <_MutableNode>[];
 
+    _PendingDetails? pendingDetails;
+
+    void flushPendingDetails() {
+      if (pendingDetails == null) {
+        return;
+      }
+      pendingDetails!.target.details.add(pendingDetails!.buffer.toString());
+      pendingDetails = null;
+    }
+
     for (final rawLine in segments) {
       if (rawLine.isEmpty) {
         continue;
       }
       final trimmedLeft = rawLine.trimLeft();
+      if (pendingDetails != null) {
+        final pending = pendingDetails!;
+        final depth = pending.depth;
+        final indent = rawLine.length - trimmedLeft.length;
+        final isContinuation =
+            indent > pending.baseIndent &&
+            indent ~/ 4 == depth &&
+            !trimmedLeft.startsWith('- ') &&
+            !trimmedLeft.startsWith('-> ');
+        if (isContinuation) {
+          final tentativeStart =
+              indent > pending.baseIndent ? pending.baseIndent + 3 : indent;
+          final startIndex =
+              tentativeStart.clamp(0, rawLine.length).toInt();
+          final content = rawLine.substring(startIndex);
+          pending.buffer.write('\n');
+          pending.buffer.write(content);
+          continue;
+        } else {
+          flushPendingDetails();
+        }
+      }
+      if (trimmedLeft.startsWith('-> ')) {
+        final indent = rawLine.length - trimmedLeft.length;
+        final depth = indent ~/ 4;
+        if (depth == 0 || stack.length < depth) {
+          continue;
+        }
+        final parent = stack[depth - 1];
+        final content = trimmedLeft.substring(3);
+        pendingDetails = _PendingDetails(
+          target: parent,
+          depth: depth,
+          baseIndent: indent,
+          buffer: StringBuffer(content),
+        );
+        continue;
+      }
       if (!trimmedLeft.startsWith('- ')) {
+        flushPendingDetails();
         continue;
       }
       final indent = rawLine.length - trimmedLeft.length;
@@ -44,6 +110,7 @@ class MindMapMarkdownConverter {
           ..clear()
           ..add(node);
       } else {
+        flushPendingDetails();
         while (stack.length > depth) {
           stack.removeLast();
         }
@@ -56,6 +123,8 @@ class MindMapMarkdownConverter {
       }
     }
 
+    flushPendingDetails();
+
     if (root == null) {
       return null;
     }
@@ -64,6 +133,9 @@ class MindMapMarkdownConverter {
       return MindMapNode(
         id: node.id,
         text: node.text,
+        details: node.details.isEmpty
+            ? ''
+            : node.details.join('\n\n'),
         children: node.children.map(convert).toList(),
       );
     }
@@ -77,5 +149,20 @@ class _MutableNode {
 
   final String id;
   final String text;
+  final List<String> details = [];
   final List<_MutableNode> children = [];
+}
+
+class _PendingDetails {
+  _PendingDetails({
+    required this.target,
+    required this.depth,
+    required this.baseIndent,
+    required this.buffer,
+  });
+
+  final _MutableNode target;
+  final int depth;
+  final int baseIndent;
+  final StringBuffer buffer;
 }

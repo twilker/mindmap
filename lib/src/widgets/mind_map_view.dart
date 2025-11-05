@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vector_math/vector_math_64.dart' as vm;
 
@@ -11,6 +12,7 @@ import '../state/mind_map_viewport.dart';
 import '../state/node_edit_request.dart';
 import '../utils/constants.dart';
 import 'node_card.dart';
+import 'node_details_dialog.dart';
 
 class MindMapViewController {
   _MindMapViewState? _state;
@@ -55,6 +57,10 @@ class MindMapView extends ConsumerStatefulWidget {
 
 class _MindMapViewState extends ConsumerState<MindMapView>
     with SingleTickerProviderStateMixin {
+  static const double _touchActionSpacing = 12;
+  static const double _touchActionButtonOffset = _touchActionSpacing / 2;
+  static const double _touchActionButtonSize = 44;
+
   late final TransformationController _controller;
   late final AnimationController _animationController;
   Animation<Matrix4>? _animation;
@@ -68,6 +74,8 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   String? _editingNodeId;
   bool _editingPreferTopHalf = false;
   Offset? _pendingDoubleTapPosition;
+  final GlobalKey _detailsCardKey = GlobalKey();
+  double _detailsCardBottom = 0;
 
   @override
   void initState() {
@@ -104,6 +112,33 @@ class _MindMapViewState extends ConsumerState<MindMapView>
 
   void _handleTransformChanged() {
     _notifyViewportChanged();
+  }
+
+  void _updateDetailsCardExtent(double top, double height) {
+    final bottom = top + height;
+    if ((_detailsCardBottom - bottom).abs() < 0.5) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _detailsCardBottom = bottom;
+    });
+  }
+
+  void _clearDetailsCardExtent() {
+    if (_detailsCardBottom == 0) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _detailsCardBottom == 0) {
+        return;
+      }
+      setState(() {
+        _detailsCardBottom = 0;
+      });
+    });
   }
 
   void _applyAnimatedValue() {
@@ -256,6 +291,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     final layoutEngine = MindMapLayoutEngine(
       textStyle: textStyle,
       textScaler: MediaQuery.textScalerOf(context),
+      verticalGap: widget.touchOnlyMode ? touchNodeVerticalGap : null,
     );
     final layout = layoutEngine.layout(mindMapState.root);
     final origin = Offset(
@@ -317,6 +353,19 @@ class _MindMapViewState extends ConsumerState<MindMapView>
   ) {
     final selectedId = mindMapState.selectedNodeId;
     final nodes = layout.nodes.values.toList();
+    final detailsCard = _buildSelectedNodeDetailsCard(
+      layout,
+      origin,
+      mindMapState,
+      contentSize,
+    );
+    final double canvasWidth = max(contentSize.width, 1);
+    final double canvasHeight = max(
+      contentSize.height,
+      detailsCard != null && _detailsCardBottom > 0
+          ? _detailsCardBottom + 24
+          : 1,
+    );
 
     bool isPointOnNode(Offset localPosition) {
       final inverse = Matrix4.inverted(_controller.value);
@@ -358,8 +407,8 @@ class _MindMapViewState extends ConsumerState<MindMapView>
         boundaryMargin: const EdgeInsets.all(double.infinity),
         constrained: false,
         child: SizedBox(
-          width: max(contentSize.width, 1),
-          height: max(contentSize.height, 1),
+          width: canvasWidth,
+          height: canvasHeight,
           child: Stack(
             children: [
               CustomPaint(
@@ -381,6 +430,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                                   ? data.branchIndex
                                   : 0) %
                               branchColors.length],
+                      touchOnlyMode: widget.touchOnlyMode,
                       onRequestFocusOnNode: widget.controller == null
                           ? null
                           : (id, {bool preferTopHalf = false}) => widget
@@ -397,6 +447,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                     ),
                   ),
                 ),
+              if (detailsCard != null) detailsCard,
               if (widget.touchOnlyMode &&
                   selectedId != null &&
                   _editingNodeId == null)
@@ -430,18 +481,19 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       data.size.width,
       data.size.height,
     );
-    const double buttonSize = 44;
-    const double spacing = 12;
+    final double buttonSize = _touchActionButtonSize;
+    final double buttonOffset = _touchActionButtonOffset;
     final double centerX = nodeRect.left + nodeRect.width / 2;
     final double centerY = nodeRect.top + nodeRect.height / 2;
     final bool isLeft = data.isLeft;
     final double childLeft = isLeft
-        ? nodeRect.left - spacing - buttonSize
-        : nodeRect.right + spacing;
+        ? nodeRect.left - buttonOffset - buttonSize
+        : nodeRect.right + buttonOffset;
     final double menuLeft = isLeft
-        ? nodeRect.right + spacing
-        : nodeRect.left - spacing - buttonSize;
+        ? nodeRect.right + buttonOffset
+        : nodeRect.left - buttonOffset - buttonSize;
     final canDelete = mindMapState.root.id != selectedId;
+    final double siblingTop = nodeRect.bottom + buttonOffset;
 
     return [
       Positioned(
@@ -460,7 +512,7 @@ class _MindMapViewState extends ConsumerState<MindMapView>
       ),
       Positioned(
         left: centerX - buttonSize / 2,
-        top: nodeRect.bottom + spacing,
+        top: siblingTop,
         child: _touchActionButton(
           icon: Icons.add_circle_outline,
           tooltip: 'Add sibling',
@@ -486,6 +538,86 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     ];
   }
 
+  Widget? _buildSelectedNodeDetailsCard(
+    MindMapLayoutResult layout,
+    Offset origin,
+    MindMapState state,
+    Size contentSize,
+  ) {
+    final selectedId = state.selectedNodeId;
+    if (selectedId == null) {
+      _clearDetailsCardExtent();
+      return null;
+    }
+    final data = layout.nodes[selectedId];
+    if (data == null) {
+      _clearDetailsCardExtent();
+      return null;
+    }
+    if (widget.touchOnlyMode && _editingNodeId != null) {
+      _clearDetailsCardExtent();
+      return null;
+    }
+    final details = data.node.details.trim();
+    if (details.isEmpty) {
+      _clearDetailsCardExtent();
+      return null;
+    }
+    const double horizontalPadding = 16;
+    final double cardWidth = min(360.0, max(220.0, data.size.width + 120));
+    final double desiredLeft = data.center.dx + origin.dx - cardWidth / 2;
+    final double maxLeft = max(
+      horizontalPadding,
+      contentSize.width - cardWidth - horizontalPadding,
+    );
+    final double left = desiredLeft.clamp(horizontalPadding, maxLeft);
+    final double baseTop =
+        data.topLeft.dy + origin.dy + data.size.height + _touchActionSpacing;
+    final double touchTop = data.topLeft.dy +
+        origin.dy +
+        data.size.height +
+        _touchActionButtonOffset +
+        _touchActionButtonSize +
+        _touchActionSpacing;
+    final double top = widget.touchOnlyMode ? touchTop : baseTop;
+    final theme = Theme.of(context);
+    final styleSheet = MarkdownStyleSheet.fromTheme(
+      theme,
+    ).copyWith(blockSpacing: 12);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final context = _detailsCardKey.currentContext;
+      final size = context?.size;
+      if (size != null) {
+        _updateDetailsCardExtent(top, size.height);
+      }
+    });
+    return Positioned(
+      left: left,
+      top: top,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360, minWidth: 200),
+        child: Material(
+          key: _detailsCardKey,
+          elevation: 4,
+          borderRadius: BorderRadius.circular(12),
+          color: theme.colorScheme.surface,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: MarkdownBody(
+              data: details,
+              shrinkWrap: true,
+              softLineBreak: true,
+              styleSheet: styleSheet,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _touchActionButton({
     required IconData icon,
     required String tooltip,
@@ -505,6 +637,23 @@ class _MindMapViewState extends ConsumerState<MindMapView>
     );
   }
 
+  Future<void> _editNodeDetails(String nodeId) async {
+    final notifier = ref.read(mindMapProvider.notifier);
+    final node = notifier.nodeById(nodeId);
+    if (node == null) {
+      return;
+    }
+    notifier.selectNode(nodeId);
+    final result = await showNodeDetailsEditorDialog(
+      context,
+      title: 'Edit details',
+      initialValue: node.details,
+    );
+    if (result != null) {
+      notifier.updateNodeDetails(nodeId, result);
+    }
+  }
+
   Future<void> _showNodeActionsSheet(
     String nodeId, {
     required bool canDelete,
@@ -522,6 +671,14 @@ class _MindMapViewState extends ConsumerState<MindMapView>
                 onTap: () {
                   Navigator.of(context).pop();
                   _startEditingNode(nodeId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.article_outlined),
+                title: const Text('Edit details'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _editNodeDetails(nodeId);
                 },
               ),
               ListTile(

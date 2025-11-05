@@ -17,6 +17,7 @@ import '../theme/app_colors.dart';
 import '../utils/constants.dart';
 import '../utils/markdown_converter.dart';
 import '../utils/mindmeister_importer.dart';
+import '../utils/json_converter.dart';
 import '../utils/bird_view_renderer.dart';
 import 'mind_map_editor_page.dart';
 
@@ -229,12 +230,12 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
       textScaler: MediaQuery.textScalerOf(context),
     ).layout(tempNotifier.state.root);
     final preview = await BirdViewRenderer.renderPreview(layout: layout);
-    final markdown = tempNotifier.exportMarkdown();
+    final document = tempNotifier.exportJson();
     tempNotifier.dispose();
     await ref
         .read(savedMapsProvider.notifier)
-        .save(name, markdown, preview: preview);
-    await _openMap(name, preloadedMarkdown: markdown);
+        .save(name, document, preview: preview);
+    await _openMap(name, preloadedDocument: document);
     _showMessage('Created "$name"');
   }
 
@@ -319,31 +320,32 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
       _showMessage('Unable to process the imported map.');
       return;
     }
-    final normalized = converter.toMarkdown(root);
     final layout = MindMapLayoutEngine(
       textStyle: textStyle,
       textScaler: MediaQuery.textScalerOf(context),
     ).layout(root);
     final preview = await BirdViewRenderer.renderPreview(layout: layout);
+    final jsonConverter = const MindMapJsonConverter();
+    final document = jsonConverter.toJson(root);
     await ref
         .read(savedMapsProvider.notifier)
-        .save(name, normalized, preview: preview);
-    await _openMap(name, preloadedMarkdown: normalized);
+        .save(name, document, preview: preview);
+    await _openMap(name, preloadedDocument: document);
     _showMessage('Imported "$name"');
   }
 
-  Future<void> _openMap(String name, {String? preloadedMarkdown}) async {
+  Future<void> _openMap(String name, {String? preloadedDocument}) async {
     final storage = ref.read(savedMapsProvider.notifier);
-    var markdown = preloadedMarkdown;
-    markdown ??= await storage.load(name);
-    if (markdown == null) {
+    var document = preloadedDocument;
+    document ??= await storage.load(name);
+    if (document == null) {
       _showMessage('Map "$name" was not found.');
       return;
     }
     if (!mounted) {
       return;
     }
-    ref.read(mindMapProvider.notifier).importFromMarkdown(markdown);
+    ref.read(mindMapProvider.notifier).importFromJson(document);
     ref.read(currentMapNameProvider.notifier).state = name;
     await Navigator.of(
       context,

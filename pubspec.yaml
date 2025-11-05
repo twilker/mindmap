@@ -42,6 +42,7 @@ dependencies:
   universal_html: ^2.2.4
   vector_math: ^2.1.4
   flutter_svg: ^2.0.10+1
+  flutter_markdown: ^0.7.1
   google_fonts: ^6.2.1
   path: ^1.9.0
   path_provider: ^2.1.4

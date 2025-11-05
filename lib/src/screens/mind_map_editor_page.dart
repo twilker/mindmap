@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/file_exporter.dart';
@@ -10,12 +10,13 @@ import '../state/current_map.dart';
 import '../state/mind_map_state.dart';
 import '../state/mind_map_storage.dart';
 import '../state/mind_map_preview_storage.dart';
-import '../state/node_edit_request.dart';
 import '../utils/bird_view_renderer.dart';
 import '../utils/constants.dart';
 import '../utils/svg_exporter.dart';
+import '../utils/touch_mode.dart';
 import '../widgets/mind_map_bird_view.dart';
 import '../widgets/mind_map_view.dart';
+import '../widgets/node_details_dialog.dart';
 import '../theme/app_colors.dart';
 
 class MindMapEditorPage extends ConsumerStatefulWidget {
@@ -32,8 +33,8 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
   late final ProviderSubscription<String?> _mapNameSubscription;
   late final ProviderSubscription<MindMapState> _mindMapSubscription;
   String? _currentMapName;
-  String? _lastSavedMarkdown;
-  String? _pendingMarkdown;
+  String? _lastSavedDocument;
+  String? _pendingDocument;
   MindMapState? _pendingState;
   bool _saving = false;
 
@@ -42,7 +43,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     super.initState();
     _currentMapName = widget.mapName;
     ref.read(currentMapNameProvider.notifier).state = widget.mapName;
-    _lastSavedMarkdown = ref.read(mindMapProvider).markdown;
+    _lastSavedDocument = ref.read(mindMapProvider).document;
     _mapNameSubscription = ref.listenManual<String?>(currentMapNameProvider, (
       previous,
       next,
@@ -71,11 +72,11 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     if (name == null) {
       return;
     }
-    if (next.markdown == _lastSavedMarkdown ||
-        next.markdown == _pendingMarkdown) {
+    if (next.document == _lastSavedDocument ||
+        next.document == _pendingDocument) {
       return;
     }
-    _pendingMarkdown = next.markdown;
+    _pendingDocument = next.document;
     _pendingState = next;
     if (_saving) {
       return;
@@ -85,14 +86,14 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
   }
 
   Future<void> _runSaveLoop() async {
-    while (_pendingMarkdown != null) {
+    while (_pendingDocument != null) {
       final name = _currentMapName;
       if (name == null) {
         break;
       }
-      final pending = _pendingMarkdown!;
+      final pending = _pendingDocument!;
       final pendingState = _pendingState;
-      _pendingMarkdown = null;
+      _pendingDocument = null;
       _pendingState = null;
       Uint8List? preview;
       if (pendingState != null) {
@@ -103,12 +104,12 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
             .read(savedMapsProvider.notifier)
             .save(name, pending, silent: true, preview: preview);
         ref.invalidate(mindMapPreviewProvider(name));
-        _lastSavedMarkdown = pending;
+        _lastSavedDocument = pending;
       } catch (err) {
         if (mounted) {
           _showMessage('Failed to save "$name": $err');
         }
-        _pendingMarkdown ??= pending;
+        _pendingDocument ??= pending;
         if (_pendingState == null && pendingState != null) {
           _pendingState = pendingState;
         }
@@ -123,6 +124,23 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _editNodeDetails(String nodeId) async {
+    final notifier = ref.read(mindMapProvider.notifier);
+    final node = notifier.nodeById(nodeId);
+    if (node == null) {
+      return;
+    }
+    notifier.selectNode(nodeId);
+    final result = await showNodeDetailsEditorDialog(
+      context,
+      title: 'Edit details',
+      initialValue: node.details,
+    );
+    if (result != null) {
+      notifier.updateNodeDetails(nodeId, result);
+    }
   }
 
   void _exportMarkdown() {
@@ -160,9 +178,9 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(mindMapProvider);
-    _lastSavedMarkdown ??= state.markdown;
+    _lastSavedDocument ??= state.document;
     final mapName = ref.watch(currentMapNameProvider) ?? widget.mapName;
-    final isTouchOnly = _isTouchOnlyPlatform();
+    final isTouchOnly = TouchModeResolver.isTouchOnly(context);
 
     final stackChildren = <Widget>[
       Positioned.fill(
@@ -175,7 +193,7 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
 
     if (!isTouchOnly) {
       stackChildren
-        ..add(_buildBirdViewOverlay())
+        ..add(_buildBirdViewOverlay(isTouchOnly))
         ..add(_buildTopControls(mapName))
         ..add(_buildViewControls())
         ..add(_buildNodeActionBar(state));
@@ -377,7 +395,6 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     final notifier = ref.read(mindMapProvider.notifier);
     final theme = Theme.of(context);
     final canDelete = state.root.id != selectedId;
-    final editRequest = ref.read(nodeEditRequestProvider.notifier);
 
     return SafeArea(
       top: false,
@@ -426,18 +443,10 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
               ),
               const SizedBox(height: 12),
               _floatingActionButton(
-                heroTag: 'node_edit',
-                icon: Icons.edit_outlined,
-                tooltip: 'Edit node',
-                onPressed: () {
-                  notifier.selectNode(selectedId);
-                  editRequest.state = null;
-                  editRequest.state = selectedId;
-                  _viewController.focusOnNode(
-                    selectedId,
-                    preferTopHalf: _isTouchOnlyPlatform(),
-                  );
-                },
+                heroTag: 'node_edit_details',
+                icon: Icons.article_outlined,
+                tooltip: 'Edit details',
+                onPressed: () => _editNodeDetails(selectedId),
               ),
             ],
           ),
@@ -468,8 +477,8 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
-  Widget _buildBirdViewOverlay() {
-    if (!_shouldShowBirdView(context)) {
+  Widget _buildBirdViewOverlay(bool isTouchOnly) {
+    if (!_shouldShowBirdView(context, isTouchOnly)) {
       return const SizedBox.shrink();
     }
     return SafeArea(
@@ -485,24 +494,8 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
     );
   }
 
-  bool _isTouchOnlyPlatform() {
-    if (kIsWeb) {
-      return false;
-    }
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.iOS:
-        return true;
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-      case TargetPlatform.windows:
-        return false;
-    }
-  }
-
-  bool _shouldShowBirdView(BuildContext context) {
-    if (_isTouchOnlyPlatform()) {
+  bool _shouldShowBirdView(BuildContext context, bool isTouchOnly) {
+    if (isTouchOnly) {
       return false;
     }
     final size = MediaQuery.sizeOf(context);

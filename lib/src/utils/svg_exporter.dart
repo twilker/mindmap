@@ -59,6 +59,13 @@ class SvgExporter {
       );
       final rectX = data.topLeft.dx;
       final rectY = data.topLeft.dy;
+      buffer.writeln('<g>');
+      final details = data.node.details.trim();
+      if (details.isNotEmpty) {
+        final escapedDetails =
+            _escape(details).replaceAll('\n', '&#10;');
+        buffer.writeln('<desc>$escapedDetails</desc>');
+      }
       buffer.writeln(
         '<rect x="$rectX" y="$rectY" width="${data.size.width}" height="${data.size.height}" rx="16" ry="16" fill="$cardFill" stroke="$stroke" stroke-width="1.5"/>',
       );
@@ -71,6 +78,7 @@ class SvgExporter {
         );
         textY += lineHeight;
       }
+      buffer.writeln('</g>');
     }
 
     buffer.writeln('</svg>');
