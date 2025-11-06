@@ -25,7 +25,21 @@
     content="YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
   />
   <!-- Load the Google APIs client so GoogleSignIn can register OAuth tokens. -->
-  <script src="https://apis.google.com/js/api.js" async defer></script>
+  <script>
+    window.__mindkiteInitGapiClient = function () {
+      if (!window.gapi || !window.gapi.load) {
+        return;
+      }
+      window.gapi.load('client', function () {
+        window.dispatchEvent(new Event('mindkite-gapi-client-ready'));
+      });
+    };
+  </script>
+  <script
+    src="https://apis.google.com/js/api.js?onload=__mindkiteInitGapiClient"
+    async
+    defer
+  ></script>
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
