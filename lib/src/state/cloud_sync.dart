@@ -17,8 +17,9 @@ final cloudSyncPersistenceProvider = Provider<CloudSyncPersistence>((ref) {
 });
 
 final cloudSyncProvidersProvider = Provider<Map<String, CloudSyncProvider>>((ref) {
+  final googleDrive = GoogleDriveSyncProvider();
   return {
-    GoogleDriveSyncProvider().id: GoogleDriveSyncProvider(),
+    googleDrive.id: googleDrive,
   };
 });
 
