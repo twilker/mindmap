@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../utils/json_converter.dart';
+import '../sync/cloud_sync_models.dart';
+import 'cloud_sync.dart';
 import 'mind_map_preview_storage.dart';
 
 final mindMapStorageProvider = Provider<MindMapStorage>((ref) {
@@ -41,6 +43,8 @@ class MindMapStorage {
   Future<void> saveMap(String name, String document) =>
       _box.put(name, document);
 
+  bool containsMap(String name) => _box.containsKey(name);
+
   Future<String?> loadMap(String name) async {
     final value = _box.get(name);
     if (value == null) {
@@ -57,9 +61,10 @@ class MindMapStorage {
 }
 
 class SavedMapsNotifier extends StateNotifier<List<String>> {
-  SavedMapsNotifier(this._storage, this._previewStorage)
+  SavedMapsNotifier(this._ref, this._storage, this._previewStorage)
     : super(_storage.listMapNames());
 
+  final Ref _ref;
   final MindMapStorage _storage;
   final MindMapPreviewStorage _previewStorage;
 
@@ -73,12 +78,20 @@ class SavedMapsNotifier extends StateNotifier<List<String>> {
     bool silent = false,
     Uint8List? preview,
   }) async {
+    final isNew = !_storage.containsMap(name);
     await _storage.saveMap(name, document);
     if (preview != null) {
       await _previewStorage.savePreview(name, preview);
     } else {
       await _previewStorage.deletePreview(name);
     }
+    await _ref
+        .read(cloudSyncControllerProvider.notifier)
+        .enqueueOperation(
+          name,
+          isNew ? SyncOperationType.create : SyncOperationType.update,
+          document: document,
+        );
     if (silent) {
       return;
     }
@@ -88,6 +101,9 @@ class SavedMapsNotifier extends StateNotifier<List<String>> {
   Future<void> delete(String name) async {
     await _storage.deleteMap(name);
     await _previewStorage.deletePreview(name);
+    await _ref
+        .read(cloudSyncControllerProvider.notifier)
+        .enqueueOperation(name, SyncOperationType.delete);
     await refresh();
   }
 
@@ -98,5 +114,5 @@ final savedMapsProvider =
     StateNotifierProvider<SavedMapsNotifier, List<String>>((ref) {
       final storage = ref.watch(mindMapStorageProvider);
       final previewStorage = ref.watch(mindMapPreviewStorageProvider);
-      return SavedMapsNotifier(storage, previewStorage);
+      return SavedMapsNotifier(ref, storage, previewStorage);
     });

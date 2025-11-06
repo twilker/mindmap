@@ -20,6 +20,7 @@ import '../utils/mindmeister_importer.dart';
 import '../utils/json_converter.dart';
 import '../utils/bird_view_renderer.dart';
 import 'mind_map_editor_page.dart';
+import '../widgets/cloud_sync_status_chip.dart';
 
 class MindMapOverviewPage extends ConsumerStatefulWidget {
   const MindMapOverviewPage({super.key});
@@ -118,18 +119,32 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'MindKite',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Let ideas fly freely.',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onBackground.withOpacity(0.7),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'MindKite',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Let ideas fly freely.',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onBackground.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const CloudSyncStatusChip(),
+                ],
               ),
             ],
           ),

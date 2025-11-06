@@ -3,10 +3,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'src/screens/map_overview_page.dart';
 import 'src/state/mind_map_storage.dart';
 import 'src/state/mind_map_preview_storage.dart';
+import 'src/state/cloud_sync.dart';
+import 'src/sync/cloud_sync_persistence.dart';
 import 'src/theme/app_theme.dart';
 
 Future<void> main() async {
@@ -14,6 +17,8 @@ Future<void> main() async {
   await Hive.initFlutter();
   final box = await Hive.openBox<String>('maps');
   final previewBox = await Hive.openBox<Uint8List>('map_previews');
+  final syncBox = await Hive.openBox<String>('cloud_sync');
+  const secureStorage = FlutterSecureStorage();
   runApp(
     ProviderScope(
       overrides: [
@@ -21,6 +26,9 @@ Future<void> main() async {
         mindMapPreviewStorageProvider.overrideWithValue(
           MindMapPreviewStorage(previewBox),
         ),
+        cloudSyncPersistenceProvider
+            .overrideWithValue(CloudSyncPersistence(syncBox)),
+        flutterSecureStorageProvider.overrideWithValue(secureStorage),
       ],
       child: const MindMapApp(),
     ),
