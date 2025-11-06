@@ -32,7 +32,10 @@ account:
   `REVERSED_CLIENT_ID` placeholder in `ios/Runner/Info.plist` to match the value
   from your plist so iOS can route the authentication callback correctly.
 - **Web:** Edit the `<meta name="google-signin-client_id">` tag in
-  `web/index.html` with your web client ID.
+  `web/index.html` with your web client ID and keep the Google APIs script tag
+  in place so the sign-in SDK can hand OAuth tokens to the JavaScript client.
+  Make sure the Google People API is enabled for your project; Google Sign-In
+  fetches profile data through it after login.
 
 Only the public OAuth client IDs are required in the application bundle. Keep
 any client secrets on the server side—Google Sign-In on mobile and web uses the
