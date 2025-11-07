@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Google Sign-In configuration (provide your own copies locally)
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist

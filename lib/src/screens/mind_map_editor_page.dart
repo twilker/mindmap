@@ -18,6 +18,7 @@ import '../widgets/mind_map_bird_view.dart';
 import '../widgets/mind_map_view.dart';
 import '../widgets/node_details_dialog.dart';
 import '../theme/app_colors.dart';
+import '../widgets/cloud_sync_status_chip.dart';
 
 class MindMapEditorPage extends ConsumerStatefulWidget {
   const MindMapEditorPage({super.key, required this.mapName});
@@ -244,6 +245,12 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         },
       ),
       actions: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Center(
+            child: CloudSyncStatusChip(compact: true),
+          ),
+        ),
         PopupMenuButton<_ExportAction>(
           icon: const Icon(Icons.ios_share),
           tooltip: 'Export',
@@ -316,6 +323,8 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
                 ),
               ),
             ],
+            const SizedBox(width: 16),
+            CloudSyncStatusChip(compact: !showName),
           ],
         ),
       ),
