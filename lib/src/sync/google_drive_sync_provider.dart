@@ -53,6 +53,11 @@ class GoogleDriveSyncProvider implements CloudSyncProvider {
   @override
   Future<CloudAccountData?> connect(CloudProviderContext context) async {
     try {
+      // On the web the GIS SDK synthesizes profile information via the People
+      // API if it cannot obtain an id token during the popup flow. Running a
+      // silent sign-in first gives the SDK a chance to capture cached identity
+      // data so we avoid the extra network hop when possible.
+      await _signIn.signInSilently();
       final account = await _signIn.signIn();
       if (account == null) {
         throw CloudSyncException.cancelled();
@@ -77,7 +82,15 @@ class GoogleDriveSyncProvider implements CloudSyncProvider {
         metadata: metadata,
       );
     } on PlatformException catch (err) {
-      throw CloudSyncException.authentication(err.message ?? 'Sign-in failed', err);
+      final message = err.message ?? 'Sign-in failed';
+      if (_looksLikePeopleApiError(err.code)) {
+        throw CloudSyncException.authentication(
+          'Google People API access is required for Google Drive sync. '
+          'Enable the People API for your OAuth client in Google Cloud and try again.',
+          err,
+        );
+      }
+      throw CloudSyncException.authentication(message, err);
     } on SocketException catch (err) {
       throw CloudSyncException.offline(err.message, err);
     } catch (err) {
@@ -86,6 +99,16 @@ class GoogleDriveSyncProvider implements CloudSyncProvider {
       }
       throw CloudSyncException.unknown('Unable to connect to Google Drive', err);
     }
+  }
+
+  bool _looksLikePeopleApiError(String code) {
+    final normalized = code.toLowerCase();
+    if (!normalized.contains('people')) {
+      return false;
+    }
+    return normalized.contains('403') ||
+        normalized.contains('insufficient') ||
+        normalized.contains('has not been used in project');
   }
 
   @override

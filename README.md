@@ -34,9 +34,10 @@ account:
 - **Web:** Edit the `<meta name="google-signin-client_id">` tag in
   `web/index.html` with your web client ID and keep the Google APIs script tag
   (including the inline initializer that calls `gapi.load('client')`) in place
-  so the sign-in SDK can hand OAuth tokens to the JavaScript client. Make sure
-  the Google People API is enabled for your project; Google Sign-In fetches
-  profile data through it after login.
+  so the sign-in SDK can hand OAuth tokens to the JavaScript client. In the
+  Google Cloud Console enable the **People API** for the same project that hosts
+  your OAuth clients; the web SDK issues a profile lookup against it after
+  authorization and will return a 403 error if the API is disabled.
 
 Only the public OAuth client IDs are required in the application bundle. Keep
 any client secrets on the server side—Google Sign-In on mobile and web uses the
