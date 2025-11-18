@@ -54,6 +54,15 @@ class MindMapStorage {
   }
 
   Future<void> deleteMap(String name) => _box.delete(name);
+
+  Future<void> rename(String oldName, String newName) async {
+    final document = await loadMap(oldName);
+    if (document == null) {
+      return;
+    }
+    await saveMap(newName, document);
+    await deleteMap(oldName);
+  }
 }
 
 class SavedMapsNotifier extends StateNotifier<List<String>> {
