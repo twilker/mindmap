@@ -23,6 +23,14 @@ class MindMapPreviewStorage {
   Future<void> deletePreview(String name) async {
     await _box?.delete(name);
   }
+
+  Future<void> renamePreview(String oldName, String newName) async {
+    final data = await loadPreview(oldName);
+    if (data != null) {
+      await savePreview(newName, data);
+    }
+    await deletePreview(oldName);
+  }
 }
 
 final mindMapPreviewProvider = FutureProvider.family<Uint8List?, String>((

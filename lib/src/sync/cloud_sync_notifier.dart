@@ -4,11 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_html/html.dart' as html;
 
+import '../state/mind_map_preview_storage.dart';
+import '../state/mind_map_storage.dart';
 import '../sync/cloud_connector.dart';
 import '../sync/cloud_service.dart';
 import '../sync/cloud_sync_operation.dart';
 import '../sync/cloud_sync_queue_storage.dart';
 import '../sync/cloud_sync_state.dart';
+import '../utils/json_converter.dart';
 import 'secure_storage.dart';
 import 'google_drive_connector.dart';
 
@@ -24,18 +27,32 @@ final cloudSyncNotifierProvider =
     StateNotifierProvider<CloudSyncNotifier, CloudSyncState>((ref) {
       final queueStorage = ref.watch(cloudSyncQueueStorageProvider);
       final storage = ref.watch(secureStorageProvider);
+      final mapStorage = ref.watch(mindMapStorageProvider);
+      final previewStorage = ref.watch(mindMapPreviewStorageProvider);
+      final savedMaps = ref.watch(savedMapsProvider.notifier);
       final connectors = <CloudConnector>[
         GoogleDriveConnector(secureStorage: storage),
       ];
-      final notifier = CloudSyncNotifier(queueStorage, connectors);
+      final notifier = CloudSyncNotifier(
+        queueStorage,
+        connectors,
+        mapStorage,
+        previewStorage,
+        savedMaps,
+      );
       notifier.initialize();
       ref.onDispose(notifier.dispose);
       return notifier;
     });
 
 class CloudSyncNotifier extends StateNotifier<CloudSyncState> {
-  CloudSyncNotifier(this._queueStorage, List<CloudConnector> connectors)
-    : _connectors = {
+  CloudSyncNotifier(
+    this._queueStorage,
+    List<CloudConnector> connectors,
+    this._mapStorage,
+    this._previewStorage,
+    this._savedMapsNotifier,
+  ) : _connectors = {
         for (final connector in connectors) connector.type: connector,
       },
       super(
@@ -56,10 +73,14 @@ class CloudSyncNotifier extends StateNotifier<CloudSyncState> {
       );
 
   final CloudSyncQueueStorage _queueStorage;
+  final MindMapStorage _mapStorage;
+  final MindMapPreviewStorage _previewStorage;
+  final SavedMapsNotifier _savedMapsNotifier;
   final Map<CloudServiceType, CloudConnector> _connectors;
   final _queue = <CloudSyncOperation>[];
   bool _processing = false;
   StreamSubscription<html.Event>? _onlineSubscription;
+  final MindMapJsonConverter _jsonConverter = const MindMapJsonConverter();
 
   Future<void> initialize() async {
     _queue
@@ -69,6 +90,9 @@ class CloudSyncNotifier extends StateNotifier<CloudSyncState> {
     for (final connector in _connectors.values) {
       await connector.initialize();
       _updateServiceState(connector);
+      if (connector.state.connected) {
+        unawaited(_pullRemoteState(connector));
+      }
     }
     _processing = false;
     _attachOnlineListener();
@@ -90,6 +114,7 @@ class CloudSyncNotifier extends StateNotifier<CloudSyncState> {
       lastError: connector.state.error,
       clearError: connector.state.error == null,
     );
+    await _pullRemoteState(connector);
     unawaited(_processQueue());
   }
 
@@ -99,8 +124,14 @@ class CloudSyncNotifier extends StateNotifier<CloudSyncState> {
       return;
     }
     await connector.disconnect();
+    _queue.clear();
+    await _queueStorage.saveQueue(_queue);
     _updateServiceState(connector);
-    state = state.copyWith(clearError: true);
+    state = state.copyWith(
+      clearError: true,
+      pendingOperations: _queue.length,
+      syncing: false,
+    );
   }
 
   Future<void> enqueueCreate(String name, String document) async {
@@ -134,6 +165,9 @@ class CloudSyncNotifier extends StateNotifier<CloudSyncState> {
   }
 
   Future<void> _enqueue(CloudSyncOperation operation) async {
+    if (!state.hasActiveService) {
+      return;
+    }
     final existingIndex = _queue.lastIndexWhere(
       (op) => op.mapName == operation.mapName,
     );
@@ -214,6 +248,63 @@ class CloudSyncNotifier extends StateNotifier<CloudSyncState> {
     state = state.copyWith(
       services: {...state.services, connector.type: current},
     );
+  }
+
+  Future<void> _pullRemoteState(CloudConnector connector) async {
+    try {
+      final documents = await connector.fetchRemoteDocuments();
+      if (documents.isEmpty) {
+        return;
+      }
+      final existing = _mapStorage.listMapNames().toSet();
+      for (final remote in documents) {
+        final parsed = _jsonConverter.fromJson(remote.document);
+        if (parsed == null) {
+          continue;
+        }
+        final normalized = _jsonConverter.toJson(parsed);
+        if (existing.contains(remote.mapName)) {
+          final localDocument = await _mapStorage.loadMap(remote.mapName);
+          if (localDocument != null) {
+            final renamed = _uniqueLocalName(remote.mapName, existing);
+            await _mapStorage.saveMap(renamed, localDocument);
+            await _previewStorage.renamePreview(remote.mapName, renamed);
+            await _retargetQueuedOperations(remote.mapName, renamed);
+            existing.add(renamed);
+          }
+        }
+        await _mapStorage.saveMap(remote.mapName, normalized);
+        existing.add(remote.mapName);
+      }
+      await _savedMapsNotifier.refresh();
+      state = state.copyWith(lastSyncedAt: DateTime.now(), clearError: true);
+    } catch (err) {
+      state = state.copyWith(lastError: 'Failed to import cloud maps: $err');
+    }
+  }
+
+  String _uniqueLocalName(String baseName, Set<String> existing) {
+    var candidate = '${baseName}_local';
+    var counter = 1;
+    while (existing.contains(candidate)) {
+      candidate = '${baseName}_local$counter';
+      counter++;
+    }
+    return candidate;
+  }
+
+  Future<void> _retargetQueuedOperations(String from, String to) async {
+    var updated = false;
+    for (var i = 0; i < _queue.length; i++) {
+      if (_queue[i].mapName == from) {
+        _queue[i] = _queue[i].copyWith(mapName: to);
+        updated = true;
+      }
+    }
+    if (updated) {
+      await _queueStorage.saveQueue(_queue);
+      state = state.copyWith(pendingOperations: _queue.length);
+    }
   }
 
   void _attachOnlineListener() {

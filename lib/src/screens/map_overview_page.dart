@@ -114,64 +114,83 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
   }
 
   Widget _buildHeroSection(ThemeData theme) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 12,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Container(
-          width: 136,
-          height: 136,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: SvgPicture.asset(
-            'assets/logo/mindkite_mark_notail_light.svg',
-            height: 92,
-            width: 92,
-          ),
-        ),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'MindKite',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Let ideas fly freely.',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onBackground.withOpacity(0.7),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+    final syncStatus = CloudSyncStatus(
+      compact: true,
+      onTap: () => showCloudSyncSheet(context),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 900;
+        final brand = Wrap(
+          spacing: 16,
+          runSpacing: 12,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            CloudSyncStatus(
-              compact: true,
-              onTap: () => showCloudSyncSheet(context),
+            Container(
+              width: 136,
+              height: 136,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: SvgPicture.asset(
+                'assets/logo/mindkite_mark_notail_light.svg',
+                height: 92,
+                width: 92,
+              ),
             ),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.cloud_sync),
-              label: const Text('Cloud sync setup'),
-              onPressed: () => showCloudSyncSheet(context),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'MindKite',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Let ideas fly freely.',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onBackground.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-      ],
+        );
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: brand),
+                  const SizedBox(width: 12),
+                  syncStatus,
+                ],
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: brand),
+            const SizedBox(width: 16),
+            Align(alignment: Alignment.topRight, child: syncStatus),
+          ],
+        );
+      },
     );
   }
 

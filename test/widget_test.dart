@@ -51,6 +51,9 @@ void main() {
             (ref) => CloudSyncNotifier(
               ref.read(cloudSyncQueueStorageProvider),
               const [],
+              ref.read(mindMapStorageProvider),
+              ref.read(mindMapPreviewStorageProvider),
+              ref.read(savedMapsProvider.notifier),
             ),
           ),
         ],

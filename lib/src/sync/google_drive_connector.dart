@@ -95,6 +95,68 @@ class GoogleDriveConnector implements CloudConnector {
   }
 
   @override
+  Future<List<CloudSyncedDocument>> fetchRemoteDocuments() async {
+    if (!_state.connected) {
+      return const [];
+    }
+    try {
+      final token = await _accessToken();
+      if (token == null) {
+        _state = _state.copyWith(
+          connected: false,
+          error: 'Google Drive session expired. Please reconnect.',
+        );
+        return const [];
+      }
+      final folderId = await _ensureFolder(token);
+      if (folderId == null) {
+        return const [];
+      }
+      final response = await _client.get(
+        Uri.https('www.googleapis.com', '/drive/v3/files', {
+          'q':
+              "'$folderId' in parents and trashed=false and mimeType='application/json'",
+          'fields': 'files(id,name)',
+          'pageSize': '1000',
+        }),
+        headers: _headers(token),
+      );
+      if (response.statusCode != 200) {
+        return const [];
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final files = (data['files'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
+      final documents = <CloudSyncedDocument>[];
+      for (final file in files) {
+        final fileId = file['id'] as String?;
+        final name = file['name'] as String?;
+        if (fileId == null || name == null) {
+          continue;
+        }
+        final contentResponse = await _client.get(
+          Uri.https('www.googleapis.com', '/drive/v3/files/$fileId', {
+            'alt': 'media',
+          }),
+          headers: _headers(token),
+        );
+        if (contentResponse.statusCode != 200) {
+          continue;
+        }
+        final mapName = name.endsWith('.json')
+            ? name.substring(0, name.length - 5)
+            : name;
+        documents.add(
+          CloudSyncedDocument(mapName: mapName, document: contentResponse.body),
+        );
+      }
+      return documents;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  @override
   Future<bool> applyOperation(CloudSyncOperation operation) async {
     if (!_state.connected) {
       return false;

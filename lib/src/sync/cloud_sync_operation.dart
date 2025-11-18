@@ -15,6 +15,20 @@ class CloudSyncOperation {
   final String document;
   final DateTime queuedAt;
 
+  CloudSyncOperation copyWith({
+    String? mapName,
+    CloudSyncOperationType? type,
+    String? document,
+    DateTime? queuedAt,
+  }) {
+    return CloudSyncOperation(
+      mapName: mapName ?? this.mapName,
+      type: type ?? this.type,
+      document: document ?? this.document,
+      queuedAt: queuedAt ?? this.queuedAt,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'mapName': mapName,
     'type': type.name,
