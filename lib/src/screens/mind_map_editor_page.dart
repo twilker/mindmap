@@ -18,6 +18,8 @@ import '../widgets/mind_map_bird_view.dart';
 import '../widgets/mind_map_view.dart';
 import '../widgets/node_details_dialog.dart';
 import '../theme/app_colors.dart';
+import '../sync/cloud_sync_notifier.dart';
+import '../widgets/cloud_sync_status.dart';
 
 class MindMapEditorPage extends ConsumerStatefulWidget {
   const MindMapEditorPage({super.key, required this.mapName});
@@ -103,6 +105,9 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         await ref
             .read(savedMapsProvider.notifier)
             .save(name, pending, silent: true, preview: preview);
+        await ref
+            .read(cloudSyncNotifierProvider.notifier)
+            .enqueueUpdate(name, pending);
         ref.invalidate(mindMapPreviewProvider(name));
         _lastSavedDocument = pending;
       } catch (err) {
@@ -244,6 +249,13 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
         },
       ),
       actions: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: CloudSyncStatus(
+            compact: true,
+            onTap: () => showCloudSyncSheet(context),
+          ),
+        ),
         PopupMenuButton<_ExportAction>(
           icon: const Icon(Icons.ios_share),
           tooltip: 'Export',
@@ -278,8 +290,20 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
           builder: (context, constraints) {
             final isCompact = constraints.maxWidth < 720;
             final header = _buildHeader(mapName, showName: !isCompact);
+            final syncStatus = CloudSyncStatus(
+              compact: isCompact,
+              onTap: () => showCloudSyncSheet(context),
+            );
             final toolbar = _buildToolbar();
-            return Row(children: [header, const Spacer(), toolbar]);
+            return Row(
+              children: [
+                header,
+                const SizedBox(width: 12),
+                syncStatus,
+                const Spacer(),
+                toolbar,
+              ],
+            );
           },
         ),
       ),
@@ -316,6 +340,11 @@ class _MindMapEditorPageState extends ConsumerState<MindMapEditorPage> {
                 ),
               ),
             ],
+            const SizedBox(width: 12),
+            CloudSyncStatus(
+              compact: true,
+              onTap: () => showCloudSyncSheet(context),
+            ),
           ],
         ),
       ),

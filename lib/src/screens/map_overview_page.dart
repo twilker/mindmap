@@ -20,6 +20,8 @@ import '../utils/mindmeister_importer.dart';
 import '../utils/json_converter.dart';
 import '../utils/bird_view_renderer.dart';
 import 'mind_map_editor_page.dart';
+import '../sync/cloud_sync_notifier.dart';
+import '../widgets/cloud_sync_status.dart';
 
 class MindMapOverviewPage extends ConsumerStatefulWidget {
   const MindMapOverviewPage({super.key});
@@ -52,40 +54,57 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
             ),
           ),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeroSection(theme),
-                  const SizedBox(height: 24),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.flight_takeoff_rounded),
-                        label: const Text('New mind map'),
-                        onPressed: _busy ? null : _createNewMap,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final gridHeight =
+                    (constraints.maxHeight - 220).clamp(320.0, 720.0) as double;
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 20,
                       ),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.file_open),
-                        label: const Text('Import file'),
-                        onPressed: _busy ? null : _importMap,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeroSection(theme),
+                          const SizedBox(height: 24),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.flight_takeoff_rounded),
+                                label: const Text('New mind map'),
+                                onPressed: _busy ? null : _createNewMap,
+                              ),
+                              FilledButton.icon(
+                                icon: const Icon(Icons.file_open),
+                                label: const Text('Import file'),
+                                onPressed: _busy ? null : _importMap,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            height: gridHeight,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 320),
+                              child: savedMaps.isEmpty
+                                  ? _buildEmptyState(theme)
+                                  : _buildSavedMapsGrid(savedMaps),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 320),
-                      child: savedMaps.isEmpty
-                          ? _buildEmptyState(theme)
-                          : _buildSavedMapsGrid(savedMaps),
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
           if (_busy) const _BusyOverlay(),
@@ -95,8 +114,10 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
   }
 
   Widget _buildHeroSection(ThemeData theme) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Wrap(
+      spacing: 16,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Container(
           width: 136,
@@ -112,8 +133,8 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
             width: 92,
           ),
         ),
-        const SizedBox(width: 20),
-        Expanded(
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -133,6 +154,22 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
               ),
             ],
           ),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            CloudSyncStatus(
+              compact: true,
+              onTap: () => showCloudSyncSheet(context),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.cloud_sync),
+              label: const Text('Cloud sync setup'),
+              onPressed: () => showCloudSyncSheet(context),
+            ),
+          ],
         ),
       ],
     );
@@ -235,6 +272,9 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
     await ref
         .read(savedMapsProvider.notifier)
         .save(name, document, preview: preview);
+    await ref
+        .read(cloudSyncNotifierProvider.notifier)
+        .enqueueCreate(name, document);
     await _openMap(name, preloadedDocument: document);
     _showMessage('Created "$name"');
   }
@@ -330,6 +370,9 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
     await ref
         .read(savedMapsProvider.notifier)
         .save(name, document, preview: preview);
+    await ref
+        .read(cloudSyncNotifierProvider.notifier)
+        .enqueueCreate(name, document);
     await _openMap(name, preloadedDocument: document);
     _showMessage('Imported "$name"');
   }
@@ -375,6 +418,7 @@ class _MindMapOverviewPageState extends ConsumerState<MindMapOverviewPage> {
       return;
     }
     await ref.read(savedMapsProvider.notifier).delete(name);
+    await ref.read(cloudSyncNotifierProvider.notifier).enqueueDelete(name);
     _showMessage('Deleted "$name"');
   }
 
